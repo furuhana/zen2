@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { DiaryEntry, AppView } from './types';
 import { analyzeEntry } from './services/geminiService';
@@ -260,6 +259,25 @@ export default function App() {
       sfx.stopLofiLoop();
     };
   }, [view, currentEntryId, isPlayingMusic]);
+
+  // --- Lobby Music Logic ---
+  useEffect(() => {
+    const isLibraryEmpty = entries.length === 0;
+
+    if (view === AppView.PLAYER) {
+      sfx.stopLobbyMusic();
+    } else {
+      if (view === AppView.RECORDER || isLibraryEmpty) {
+         // High Volume for Recorder or Empty Home
+         sfx.startLobbyMusic();
+         sfx.setLobbyVolume(0.3); // Louder
+      } else {
+         // Low Volume for Library with tapes
+         sfx.startLobbyMusic();
+         sfx.setLobbyVolume(0.05); // Very quiet
+      }
+    }
+  }, [view, entries.length]);
 
   // --- Typewriter ---
   useEffect(() => {

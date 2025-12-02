@@ -10,6 +10,11 @@ export class AudioService {
   private activeNodes: AudioNode[] = [];
   private tapeHissNode: AudioBufferSourceNode | null = null;
 
+  // Lobby/Ambient Music State
+  private lobbyNodes: AudioNode[] = [];
+  private lobbyGain: GainNode | null = null;
+  private lobbyTimeouts: number[] = []; // Track sequencer timeouts for lobby
+
   // Note Frequencies
   private NOTES: Record<string, number> = {
     'R': 0,
@@ -92,7 +97,7 @@ export class AudioService {
 
   // --- Instruments ---
 
-  private playMelodyNote(noteName: string, startTime: number, duration: number) {
+  private playMelodyNote(noteName: string, startTime: number, duration: number, destination?: AudioNode) {
     if (!this.ctx || !this.masterGain || noteName === 'R') return;
     const freq = this.NOTES[noteName];
     if (!freq) return;
@@ -100,6 +105,7 @@ export class AudioService {
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
     const filter = this.ctx.createBiquadFilter();
+    const dest = destination || this.masterGain;
 
     osc.type = 'square'; // 8-bit lead
     osc.frequency.setValueAtTime(freq, startTime);
@@ -117,19 +123,20 @@ export class AudioService {
 
     osc.connect(filter);
     filter.connect(gain);
-    gain.connect(this.masterGain);
+    gain.connect(dest);
     osc.start(startTime);
     osc.stop(startTime + duration);
     this.activeNodes.push(osc, gain);
   }
 
-  private playBassNote(noteName: string, startTime: number, duration: number) {
+  private playBassNote(noteName: string, startTime: number, duration: number, destination?: AudioNode) {
     if (!this.ctx || !this.masterGain || noteName === 'R') return;
     const freq = this.NOTES[noteName];
     if (!freq) return;
 
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
+    const dest = destination || this.masterGain;
 
     osc.type = 'triangle'; // Rounder bass
     osc.frequency.setValueAtTime(freq, startTime);
@@ -139,16 +146,17 @@ export class AudioService {
     gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
 
     osc.connect(gain);
-    gain.connect(this.masterGain);
+    gain.connect(dest);
     osc.start(startTime);
     osc.stop(startTime + duration);
     this.activeNodes.push(osc, gain);
   }
 
-  private playKick(startTime: number) {
+  private playKick(startTime: number, destination?: AudioNode) {
     if (!this.ctx || !this.masterGain) return;
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
+    const dest = destination || this.masterGain;
 
     osc.type = 'sine'; // Deep kick
     osc.frequency.setValueAtTime(150, startTime);
@@ -158,14 +166,15 @@ export class AudioService {
     gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.15);
 
     osc.connect(gain);
-    gain.connect(this.masterGain);
+    gain.connect(dest);
     osc.start(startTime);
     osc.stop(startTime + 0.15);
     this.activeNodes.push(osc, gain);
   }
 
-  private playSnare(startTime: number) {
+  private playSnare(startTime: number, destination?: AudioNode) {
     if (!this.ctx || !this.masterGain) return;
+    const dest = destination || this.masterGain;
     
     // Noise part
     const buffer = this.createNoiseBuffer();
@@ -176,7 +185,7 @@ export class AudioService {
         gain.gain.setValueAtTime(0.1, startTime);
         gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.1);
         source.connect(gain);
-        gain.connect(this.masterGain);
+        gain.connect(dest);
         source.start(startTime);
         source.stop(startTime + 0.1);
         this.activeNodes.push(source, gain);
@@ -191,14 +200,15 @@ export class AudioService {
     oscGain.gain.setValueAtTime(0.05, startTime);
     oscGain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.05);
     osc.connect(oscGain);
-    oscGain.connect(this.masterGain);
+    oscGain.connect(dest);
     osc.start(startTime);
     osc.stop(startTime + 0.05);
     this.activeNodes.push(osc, oscGain);
   }
 
-  private playHiHat(startTime: number) {
+  private playHiHat(startTime: number, destination?: AudioNode) {
     if (!this.ctx || !this.masterGain) return;
+    const dest = destination || this.masterGain;
     const buffer = this.createNoiseBuffer();
     if (buffer) {
         const source = this.ctx.createBufferSource();
@@ -211,7 +221,7 @@ export class AudioService {
         gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.05);
         source.connect(filter);
         filter.connect(gain);
-        gain.connect(this.masterGain);
+        gain.connect(dest);
         source.start(startTime);
         source.stop(startTime + 0.05);
         this.activeNodes.push(source, gain);
@@ -219,7 +229,6 @@ export class AudioService {
   }
 
   // --- Public SFX Methods ---
-  // (Kept standard interactions simple)
   public playBoot() { this.playTone(110, 'square', 0.1, 0); }
   public playClick() { this.playTone(1200, 'square', 0.05, 0, 0.05); }
   public playHover() { this.playTone(600, 'sawtooth', 0.02, 0, 0.02); }
@@ -247,7 +256,133 @@ export class AudioService {
     noise.connect(gain); gain.connect(this.masterGain); noise.start(); noise.stop(this.ctx.currentTime + duration);
   }
 
-  // --- Music Sequencer ---
+  // --- Lobby Music (Sequencer) ---
+  public startLobbyMusic() {
+    this.init();
+    if (!this.ctx || !this.masterGain) return;
+    
+    // Only start if not already playing
+    if (this.lobbyTimeouts.length > 0) return;
+
+    this.lobbyGain = this.ctx.createGain();
+    this.lobbyGain.gain.setValueAtTime(0.1, this.ctx.currentTime); // Start Vol
+    this.lobbyGain.connect(this.masterGain);
+
+    // Background Hiss (Softer for lobby)
+    const buffer = this.createNoiseBuffer();
+    if (buffer) {
+        const hiss = this.ctx.createBufferSource();
+        hiss.buffer = buffer;
+        hiss.loop = true;
+        const hissGain = this.ctx.createGain();
+        hissGain.gain.value = 0.015; // Very subtle
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.value = 600;
+        hiss.connect(filter);
+        filter.connect(hissGain);
+        hissGain.connect(this.lobbyGain);
+        hiss.start();
+        this.lobbyNodes.push(hiss, hissGain, filter);
+    }
+
+    // Lobby Pattern: Relaxed 70 BPM (approx 0.85s per beat, 1/8 note = 0.425s)
+    // Structure: Simple repeated loop
+    const eighth = 0.425;
+    const quarter = 0.85;
+
+    const lobbyPattern = {
+        melody: [
+            ['E4', 2], ['R', 1], ['D4', 1], ['C4', 2], ['R', 2],
+            ['G3', 2], ['A3', 2], ['C4', 4]
+        ],
+        bass: [
+            ['C2', 4], ['G2', 4],
+            ['A2', 4], ['F2', 4]
+        ],
+        kick: [
+            ['C1', 4], ['R', 4], 
+            ['C1', 4], ['R', 4]
+        ],
+        snare: [
+            ['R', 4], ['D1', 4], 
+            ['R', 4], ['D1', 4]
+        ],
+        hihat: [
+            ['F1', 1], ['F1', 1], ['F1', 1], ['F1', 1], 
+            ['F1', 1], ['F1', 1], ['F1', 1], ['F1', 1],
+            ['F1', 1], ['F1', 1], ['F1', 1], ['F1', 1], 
+            ['F1', 1], ['F1', 1], ['F1', 1], ['F1', 1]
+        ]
+    };
+
+    // Helper to get duration in seconds
+    const getLobbyDuration = (units: number) => units * eighth;
+
+    const playLobbyTrack = (trackName: string, notes: [string, number][], loopIndex: number = 0) => {
+        if (!this.ctx || !this.lobbyGain) return;
+        if (loopIndex >= notes.length) loopIndex = 0;
+
+        const [note, durationUnits] = notes[loopIndex];
+        const durationSeconds = getLobbyDuration(durationUnits);
+        const now = this.ctx.currentTime;
+
+        // Route all lobby sounds to lobbyGain
+        if (trackName === 'melody') this.playMelodyNote(note, now, durationSeconds, this.lobbyGain);
+        else if (trackName === 'bass') this.playBassNote(note, now, durationSeconds, this.lobbyGain);
+        else if (trackName === 'kick' && note !== 'R') this.playKick(now, this.lobbyGain);
+        else if (trackName === 'snare' && note !== 'R') this.playSnare(now, this.lobbyGain);
+        else if (trackName === 'hihat' && note !== 'R') this.playHiHat(now, this.lobbyGain);
+
+        const id = window.setTimeout(() => {
+            playLobbyTrack(trackName, notes, loopIndex + 1);
+        }, durationSeconds * 1000);
+        
+        this.lobbyTimeouts.push(id);
+    };
+
+    playLobbyTrack('melody', lobbyPattern.melody as [string, number][]);
+    playLobbyTrack('bass', lobbyPattern.bass as [string, number][]);
+    playLobbyTrack('kick', lobbyPattern.kick as [string, number][]);
+    playLobbyTrack('snare', lobbyPattern.snare as [string, number][]);
+    playLobbyTrack('hihat', lobbyPattern.hihat as [string, number][]);
+  }
+
+  public setLobbyVolume(vol: number) {
+    if (this.lobbyGain && this.ctx) {
+        // Smooth ramp to avoid clicks
+        this.lobbyGain.gain.setTargetAtTime(vol, this.ctx.currentTime, 0.5);
+    }
+  }
+
+  public stopLobbyMusic() {
+    // Clear Sequencer
+    this.lobbyTimeouts.forEach(id => clearTimeout(id));
+    this.lobbyTimeouts = [];
+
+    if (this.lobbyGain && this.ctx) {
+         // Fade out then stop
+         this.lobbyGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.2);
+         setTimeout(() => {
+             this.lobbyNodes.forEach(node => {
+                 try {
+                    if (node instanceof OscillatorNode || node instanceof AudioBufferSourceNode) node.stop();
+                    node.disconnect();
+                 } catch(e) {}
+             });
+             this.lobbyNodes = [];
+             if (this.lobbyGain) this.lobbyGain.disconnect();
+             this.lobbyGain = null;
+         }, 300);
+    } else {
+        this.lobbyNodes.forEach(node => {
+            try { node.disconnect(); } catch(e) {}
+        });
+        this.lobbyNodes = [];
+    }
+  }
+
+  // --- Music Sequencer (Tape Player) ---
 
   private getDuration(type: number): number {
     return (4 / type) * this.BEAT_DURATION;
