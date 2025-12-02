@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Save, X } from 'lucide-react';
 import { sfx } from '../services/audioService';
+import { Tape } from './Tape';
 
 interface RecorderProps {
   onSave: (title: string, content: string, color: string, emoji: string, author: string, moodId: string) => void;
@@ -24,12 +25,27 @@ export const Recorder: React.FC<RecorderProps> = ({ onSave, onCancel, isProcessi
   const [title, setTitle] = useState('');
   const [author, setAuthor] = useState('');
   const [selectedMood, setSelectedMood] = useState(MOODS[2]); // Default to Throbbing/Excited
+  const [headerText, setHeaderText] = useState(''); // Typewriter state
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.focus();
     }
+    
+    // Header Typewriter Effect
+    const targetText = "REC_MODE";
+    let index = 0;
+    const timer = setInterval(() => {
+      if (index < targetText.length) {
+        setHeaderText(targetText.slice(0, index + 1));
+        index++;
+      } else {
+        clearInterval(timer);
+      }
+    }, 100);
+    
+    return () => clearInterval(timer);
   }, []);
 
   const handleTyping = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -52,11 +68,21 @@ export const Recorder: React.FC<RecorderProps> = ({ onSave, onCancel, isProcessi
       onClick={(e) => e.stopPropagation()} 
       className="flex flex-col h-full max-w-4xl mx-auto w-full p-4 relative justify-center"
     >
+      <style>{`
+        @keyframes dropIn {
+          0% { transform: scale(1.5); opacity: 0; }
+          100% { transform: scale(0.9); opacity: 0.8; }
+        }
+        .animate-drop-in {
+          animation: dropIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+      `}</style>
+
       {/* Header / HUD */}
       <div className="flex justify-between items-end mb-4 border-b-2 border-orange-700/50 pb-2">
         <div>
-          <h2 className="text-3xl text-orange-500 font-bold uppercase tracking-widest drop-shadow-[0_0_8px_rgba(249,115,22,0.8)]">
-            REC_MODE
+          <h2 className="text-3xl text-orange-500 font-bold uppercase tracking-widest drop-shadow-[0_0_8px_rgba(249,115,22,0.8)] min-h-[36px]">
+            {headerText}<span className="animate-pulse">_</span>
           </h2>
           <p className="text-xs text-orange-400/70 mt-1">入力ストリーム: KEYBOARD_MATRIX_01</p>
         </div>
@@ -118,13 +144,9 @@ export const Recorder: React.FC<RecorderProps> = ({ onSave, onCancel, isProcessi
           value={text}
           onChange={handleTyping}
           className="w-full h-full bg-transparent text-amber-500 font-mono text-lg md:text-xl resize-none outline-none focus:ring-0 placeholder-amber-900/50 z-20 relative leading-relaxed"
-          placeholder="INITIATE THOUGHT STREAM..."
+          placeholder=""
           spellCheck={false}
         />
-        
-        {!text && (
-           <div className="absolute top-7 left-6 w-3 h-5 bg-amber-500 animate-pulse pointer-events-none opacity-50"></div>
-        )}
       </div>
 
       {/* Control Deck */}

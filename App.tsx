@@ -466,11 +466,13 @@ export default function App() {
         @keyframes slideIn { from { transform: translateY(100px) scale(0.8); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }
         @keyframes cuteWobble { 0% { transform: rotate(0deg); } 25% { transform: rotate(1deg); } 75% { transform: rotate(-1deg); } 100% { transform: rotate(0deg); } }
         @keyframes backLightPulse { 0%, 100% { opacity: 0.5; transform: scale(1); } 50% { opacity: 0.7; transform: scale(1.1); } }
+        @keyframes dropIn { 0% { transform: scale(1.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
         .slide-left { animation: slideOutLeft 0.3s forwards ease-in; }
         .slide-right { animation: slideOutRight 0.3s forwards ease-in; }
         .slide-in { animation: slideIn 0.4s forwards cubic-bezier(0.175, 0.885, 0.32, 1.275); }
         .cute-wobble { animation: cuteWobble 4s infinite ease-in-out; }
         .backlight-pulse { animation: backLightPulse 4s infinite ease-in-out; }
+        .animate-drop-in { animation: dropIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
       `}</style>
       
       {/* Background Layer */}
@@ -505,17 +507,18 @@ export default function App() {
         {view === AppView.LIBRARY && (
           <div ref={libraryRef} className="flex-1 w-full h-full p-8 relative overflow-hidden">
             {entries.length === 0 ? (
-              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <div className="flex flex-col items-center justify-center h-64 border-2 border-dashed border-neutral-800 rounded-lg text-neutral-600 w-full max-w-lg backdrop-blur-sm bg-black/40 pointer-events-auto">
-                   <p className="mb-4">NO DATA FOUND ON DRIVE</p>
-                   <button 
-                     onClick={() => changeView(AppView.RECORDER)}
-                     className="text-amber-600 hover:text-amber-500 underline underline-offset-4"
-                   >
-                     插入新磁带
-                   </button>
-                </div>
-              </div>
+               <div className="absolute inset-0 flex items-center justify-center pointer-events-auto z-10">
+                  <div className="animate-drop-in cursor-pointer" onClick={() => changeView(AppView.RECORDER)}>
+                     <Tape
+                       label="新建一个磁带"
+                       date=""
+                       color="bg-neutral-300"
+                       emoji=""
+                       author=""
+                       className="grayscale hover:scale-105 transition-transform duration-300"
+                     />
+                  </div>
+               </div>
             ) : (
                <div className="absolute inset-0 w-full h-full">
                   {entries.map((entry, index) => {
