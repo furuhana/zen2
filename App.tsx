@@ -6,6 +6,7 @@ import { sfx } from './services/audioService';
 import { Tape } from './components/Tape';
 import { Recorder } from './components/Recorder';
 import { PixelAvatar } from './components/PixelAvatar';
+import { ContainerBackground } from './components/ContainerBackground';
 import { Plus, Trash2, Rewind, Play, Pause, FastForward, ChevronLeft, Cpu, Volume2, Download, Upload } from 'lucide-react';
 
 const STORAGE_KEY = 'retrolog_entries_v1';
@@ -27,6 +28,33 @@ interface Position {
   r: number;
   z: number;
 }
+
+const StatusDisplay = ({ count }: { count: number }) => {
+  const mem = Math.floor(count * 1.4);
+  const fullText = `TAPES: ${count}  MEM: ${mem}KB`;
+  const [displayText, setDisplayText] = useState('');
+
+  useEffect(() => {
+    let index = 0;
+    setDisplayText(''); // Reset
+    const timer = setInterval(() => {
+      if (index < fullText.length) {
+        setDisplayText(fullText.slice(0, index + 1));
+        index++;
+      } else {
+        clearInterval(timer);
+      }
+    }, 40); // Typing speed
+    return () => clearInterval(timer);
+  }, [fullText]);
+
+  return (
+    <div className="flex gap-4 text-xs tracking-widest text-amber-700 items-center justify-end min-w-[200px]">
+       <div className="font-mono">{displayText}</div>
+       <Volume2 size={14} className="opacity-50" />
+    </div>
+  );
+};
 
 export default function App() {
   const [entries, setEntries] = useState<DiaryEntry[]>([]);
@@ -445,8 +473,11 @@ export default function App() {
         .backlight-pulse { animation: backLightPulse 4s infinite ease-in-out; }
       `}</style>
       
+      {/* Background Layer */}
+      <ContainerBackground />
+      
       {/* Top Bar - Fixed height (h-20) to prevent jumping */}
-      <header className="h-20 border-b border-amber-900/30 bg-[#0a0a0a]/90 backdrop-blur-sm p-4 flex justify-between items-center sticky top-0 z-40 shadow-2xl shrink-0">
+      <header className="h-20 border-b border-amber-900/30 bg-[#0a0a0a]/80 backdrop-blur-md p-4 flex justify-between items-center sticky top-0 z-40 shadow-2xl shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 border-2 border-amber-600 rounded-sm flex items-center justify-center bg-amber-900/20">
              <div className="w-4 h-4 bg-amber-500 rounded-full animate-pulse"></div>
@@ -454,11 +485,7 @@ export default function App() {
           <h1 className="text-2xl font-bold tracking-tighter text-amber-500/90 hidden sm:block">レトロログ <span className="text-xs align-top opacity-50">未来派日记 v1.4</span></h1>
         </div>
 
-        <div className="flex gap-4 text-xs tracking-widest text-amber-700 items-center">
-           <div>TAPES: {entries.length}</div>
-           <div className="hidden sm:block">MEM: {Math.floor(entries.length * 1.4)}KB</div>
-           <Volume2 size={14} className="opacity-50" />
-        </div>
+        <StatusDisplay count={entries.length} />
 
         {view === AppView.LIBRARY && (
              <button 
@@ -479,7 +506,7 @@ export default function App() {
           <div ref={libraryRef} className="flex-1 w-full h-full p-8 relative overflow-hidden">
             {entries.length === 0 ? (
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <div className="flex flex-col items-center justify-center h-64 border-2 border-dashed border-neutral-800 rounded-lg text-neutral-600 w-full max-w-lg backdrop-blur-sm bg-black/20 pointer-events-auto">
+                <div className="flex flex-col items-center justify-center h-64 border-2 border-dashed border-neutral-800 rounded-lg text-neutral-600 w-full max-w-lg backdrop-blur-sm bg-black/40 pointer-events-auto">
                    <p className="mb-4">NO DATA FOUND ON DRIVE</p>
                    <button 
                      onClick={() => changeView(AppView.RECORDER)}
@@ -537,7 +564,7 @@ export default function App() {
 
         {view === AppView.RECORDER && (
           <div 
-            className="flex-1 overflow-y-auto z-20 flex items-center justify-center"
+            className="flex-1 overflow-y-auto z-20 flex items-center justify-center bg-black/60 backdrop-blur-sm"
             onClick={() => changeView(AppView.LIBRARY)}
           >
             <Recorder 
@@ -551,7 +578,7 @@ export default function App() {
         {view === AppView.PLAYER && currentEntry && (
           <div 
             onClick={handleClosePlayer}
-            className="flex-1 overflow-y-auto p-4 flex items-center justify-center cursor-zoom-out z-30"
+            className="flex-1 overflow-y-auto p-4 flex items-center justify-center cursor-zoom-out z-30 bg-black/60 backdrop-blur-sm"
           >
             <div 
               onClick={(e) => e.stopPropagation()} 
@@ -619,7 +646,7 @@ export default function App() {
         )}
       </main>
 
-      <footer className="bg-black border-t border-neutral-800 p-2 text-[10px] text-neutral-600 flex justify-between items-center font-mono uppercase shrink-0 z-10 relative">
+      <footer className="bg-black/90 backdrop-blur border-t border-neutral-800 p-2 text-[10px] text-neutral-600 flex justify-between items-center font-mono uppercase shrink-0 z-10 relative">
         <div className="flex gap-4">
           <input 
             type="file" 

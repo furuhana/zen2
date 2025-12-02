@@ -28,6 +28,7 @@ export const Tape: React.FC<TapeProps> = ({ label, date, color = "bg-amber-600",
       className={`
         relative group cursor-pointer w-[330px] h-[200px] 
         transition-transform duration-500 ease-in-out
+        bg-neutral-800 rounded-lg outline-1 outline-transparent
         ${isFlipped ? 'rotate-y-180' : ''}
         ${className}
       `}
