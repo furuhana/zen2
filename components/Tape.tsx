@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { sfx } from '../services/audioService';
+import { Plus } from 'lucide-react';
 
 interface TapeProps {
   label: string;
@@ -12,11 +13,12 @@ interface TapeProps {
   isPlaying?: boolean;
   isAnalyzing?: boolean;
   isFlipped?: boolean;
+  showPlusIcon?: boolean;
   style?: React.CSSProperties; // Allow passing z-index and transform
   className?: string;
 }
 
-export const Tape: React.FC<TapeProps> = ({ label, date, color = "bg-amber-600", emoji, author = "UNKNOWN", onClick, isPlaying, isAnalyzing, isFlipped = false, style, className = "" }) => {
+export const Tape: React.FC<TapeProps> = ({ label, date, color = "bg-amber-600", emoji, author = "UNKNOWN", onClick, isPlaying, isAnalyzing, isFlipped = false, showPlusIcon = false, style, className = "" }) => {
   return (
     <div 
       onClick={onClick}
@@ -68,8 +70,9 @@ export const Tape: React.FC<TapeProps> = ({ label, date, color = "bg-amber-600",
                   {isAnalyzing ? 'ANALYZING...' : (label || 'UNTITLED')}
                 </span>
                 <div className="flex items-center gap-1">
-                  {emoji && <span className="text-sm">{emoji}</span>}
-                  <span className="text-neutral-500 text-[10px] font-mono">{date}</span>
+                  {showPlusIcon && <Plus className="text-red-600 w-5 h-5 opacity-80" />}
+                  {!showPlusIcon && emoji && <span className="text-sm">{emoji}</span>}
+                  {!showPlusIcon && <span className="text-neutral-500 text-[10px] font-mono">{date}</span>}
                 </div>
             </div>
             

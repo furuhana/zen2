@@ -508,14 +508,18 @@ export default function App() {
           <div ref={libraryRef} className="flex-1 w-full h-full p-8 relative overflow-hidden">
             {entries.length === 0 ? (
                <div className="absolute inset-0 flex items-center justify-center pointer-events-auto z-10">
-                  <div className="animate-drop-in cursor-pointer" onClick={() => changeView(AppView.RECORDER)}>
+                  <div 
+                    className="animate-drop-in cursor-pointer group" 
+                    onClick={() => changeView(AppView.RECORDER)}
+                  >
                      <Tape
                        label="新建一个磁带"
                        date=""
                        color="bg-neutral-300"
                        emoji=""
                        author=""
-                       className="grayscale hover:scale-105 transition-transform duration-300"
+                       showPlusIcon={true}
+                       className="grayscale group-hover:scale-105 transition-transform duration-300"
                      />
                   </div>
                </div>
