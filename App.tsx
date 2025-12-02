@@ -6,7 +6,7 @@ import { sfx } from './services/audioService';
 import { Tape } from './components/Tape';
 import { Recorder } from './components/Recorder';
 import { PixelAvatar } from './components/PixelAvatar';
-import { Plus, Trash2, Rewind, Play, Pause, FastForward, ChevronLeft, Cpu, Volume2 } from 'lucide-react';
+import { Plus, Trash2, Rewind, Play, Pause, FastForward, ChevronLeft, Cpu, Volume2, Download, Upload } from 'lucide-react';
 
 const STORAGE_KEY = 'retrolog_entries_v1';
 const POSITIONS_KEY = 'retrolog_positions_v1';
@@ -25,6 +25,7 @@ interface Position {
   x: number;
   y: number;
   r: number;
+  z: number;
 }
 
 export default function App() {
@@ -33,12 +34,15 @@ export default function App() {
   const [currentEntryId, setCurrentEntryId] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false); 
   const [showIntro, setShowIntro] = useState(true);
+  const [loadingProgress, setLoadingProgress] = useState(0);
   
   // Layout & Dragging State
   const [tapePositions, setTapePositions] = useState<Record<string, Position>>({});
   const [dragState, setDragState] = useState<{ id: string, startX: number, startY: number, initialX: number, initialY: number } | null>(null);
+  const [droppingId, setDroppingId] = useState<string | null>(null); // For closing animation
   const isDraggingRef = useRef(false); // Track if a move actually happened
   const libraryRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Player specific state
   const [isPlayingMusic, setIsPlayingMusic] = useState(true);
@@ -64,11 +68,20 @@ export default function App() {
       setTapePositions(JSON.parse(savedPositions));
     }
     
-    const timer = setTimeout(() => {
-      sfx.playBoot();
-      setShowIntro(false);
-    }, 2000);
-    return () => clearTimeout(timer);
+    // Improved Loading Sequence
+    const interval = setInterval(() => {
+      setLoadingProgress(prev => {
+        if (prev >= 100) {
+          clearInterval(interval);
+          sfx.playBoot();
+          setShowIntro(false);
+          return 100;
+        }
+        return prev + 5; // Fast load
+      });
+    }, 40); // Total approx 800ms
+
+    return () => clearInterval(interval);
   }, []);
 
   // Save to local storage
@@ -84,10 +97,19 @@ export default function App() {
   useEffect(() => {
     const newPositions = { ...tapePositions };
     let hasChanges = false;
+    let maxZ = 0;
+    
+    Object.values(newPositions).forEach(pos => {
+      if (pos.z > maxZ) maxZ = pos.z;
+    });
 
-    // Use a larger spread area for initialization
-    const spreadW = Math.min(window.innerWidth * 0.9, 1400); 
-    const spreadH = Math.min(window.innerHeight * 0.9, 900);
+    // Calculate bounds to keep tapes within screen
+    // Tape approx 330px width, 200px height. 
+    // We want center point bounds.
+    const marginX = 180; 
+    const marginY = 120;
+    const availableW = window.innerWidth - (marginX * 2);
+    const availableH = window.innerHeight - (marginY * 2);
 
     entries.forEach(entry => {
       if (!newPositions[entry.id]) {
@@ -96,10 +118,12 @@ export default function App() {
         const rngRot = seededRandom(entry.id + 'r');
         
         newPositions[entry.id] = {
-          x: (rngX * spreadW) - (spreadW / 2),
-          y: (rngY * spreadH) - (spreadH / 2),
+          // Clamp within visible area
+          x: (rngX * availableW) - (availableW / 2),
+          y: (rngY * availableH) - (availableH / 2),
           // Range: -40 to +40 degrees (Varied but under 45 limit)
-          r: (rngRot * 80) - 40 
+          r: (rngRot * 80) - 40,
+          z: ++maxZ
         };
         hasChanges = true;
       }
@@ -110,6 +134,17 @@ export default function App() {
     }
   }, [entries]);
 
+  // Animation effect for dropping tape
+  useEffect(() => {
+    if (droppingId) {
+      // Small delay to allow CSS transition to trigger from the large scale state
+      const timer = setTimeout(() => {
+        setDroppingId(null);
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [droppingId]);
+
   // --- Drag Logic ---
   const handleMouseDown = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
@@ -117,7 +152,21 @@ export default function App() {
     
     isDraggingRef.current = false; // Reset drag flag
     
-    const pos = tapePositions[id] || { x: 0, y: 0, r: 0 };
+    // Find highest Z to bring to front
+    let maxZ = 0;
+    Object.values(tapePositions).forEach(pos => {
+      if (pos.z && pos.z > maxZ) maxZ = pos.z;
+    });
+
+    setTapePositions(prev => ({
+      ...prev,
+      [id]: {
+        ...prev[id],
+        z: maxZ + 1
+      }
+    }));
+    
+    const pos = tapePositions[id] || { x: 0, y: 0, r: 0, z: 0 };
     setDragState({
       id,
       startX: e.clientX,
@@ -232,6 +281,7 @@ export default function App() {
     setEntries(prev => [newEntry, ...prev]);
     sfx.playEjectTape();
     setView(AppView.LIBRARY);
+    setDroppingId(newEntry.id); // Animate new tape dropping in
     try {
       const analysis = await analyzeEntry(content);
       setEntries(prev => prev.map(entry => 
@@ -295,6 +345,7 @@ export default function App() {
   const handleClosePlayer = () => {
     sfx.stopLofiLoop(); 
     sfx.playPowerDown();
+    setDroppingId(currentEntryId); // Trigger closing animation for this specific tape
     setView(AppView.LIBRARY);
     setCurrentEntryId(null);
     setIsPlayingMusic(true); 
@@ -311,12 +362,66 @@ export default function App() {
     return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
   };
 
+  const handleExport = () => {
+    const dataStr = JSON.stringify(entries, null, 2);
+    const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+    
+    const exportFileDefaultName = `retrolog_backup_${new Date().toISOString().slice(0,10)}.json`;
+
+    const linkElement = document.createElement('a');
+    linkElement.setAttribute('href', dataUri);
+    linkElement.setAttribute('download', exportFileDefaultName);
+    linkElement.click();
+    sfx.playClick();
+  };
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleImportFile = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const fileReader = new FileReader();
+    const files = event.target.files;
+    
+    if (files && files.length > 0) {
+      fileReader.readAsText(files[0], "UTF-8");
+      fileReader.onload = (e) => {
+        try {
+          const importedEntries = JSON.parse(e.target?.result as string);
+          if (Array.isArray(importedEntries)) {
+            // Merge logic: Add entries that don't exist by ID
+            setEntries(prev => {
+              const existingIds = new Set(prev.map(p => p.id));
+              const newUnique = importedEntries.filter((ie: DiaryEntry) => !existingIds.has(ie.id));
+              return [...newUnique, ...prev];
+            });
+            sfx.playSuccess();
+          }
+        } catch (error) {
+          console.error("Import failed", error);
+          sfx.playDelete(); // Error sound
+        }
+      };
+    }
+  };
+
   if (showIntro) {
     return (
-      <div className="h-screen w-full flex items-center justify-center bg-black text-amber-500 font-mono flex-col gap-4">
+      <div className="h-screen w-full flex items-center justify-center bg-black text-amber-500 font-mono flex-col gap-4 z-50 fixed top-0 left-0">
         <Cpu size={64} className="animate-pulse" />
         <div className="text-2xl tracking-[0.5em] animate-pulse">BOOTING_SYSTEM</div>
-        <div className="text-xs text-amber-800">MEM_CHECK: OK | TAPE_DRIVE: MOUNTED</div>
+        
+        {/* Retro Loading Bar */}
+        <div className="w-64 h-4 border-2 border-amber-800 p-0.5 rounded">
+          <div 
+            className="h-full bg-amber-600 transition-all duration-75 ease-linear"
+            style={{ width: `${loadingProgress}%` }}
+          ></div>
+        </div>
+        
+        <div className="text-xs text-amber-800 mt-2">
+          MEM_CHECK: {Math.floor(loadingProgress)}% | TAPE_DRIVE: MOUNTED
+        </div>
       </div>
     );
   }
@@ -387,8 +492,15 @@ export default function App() {
             ) : (
                <div className="absolute inset-0 w-full h-full">
                   {entries.map((entry, index) => {
-                    const pos = tapePositions[entry.id] || { x: 0, y: 0, r: 0 };
+                    const pos = tapePositions[entry.id] || { x: 0, y: 0, r: 0, z: index };
                     const isDragging = dragState?.id === entry.id;
+                    const isDropping = droppingId === entry.id;
+
+                    // Calculate Scale: 
+                    // 1.15 if dragging
+                    // 1.5 -> 1.2 if dropping (closing animation) - REDUCED FROM 2.5
+                    // 1.2 normally
+                    const scale = isDragging ? 1.15 : (isDropping ? 1.5 : 1.2);
 
                     return (
                       <div 
@@ -396,11 +508,13 @@ export default function App() {
                         className="absolute top-1/2 left-1/2 transition-shadow duration-300"
                         onMouseDown={(e) => handleMouseDown(e, entry.id)}
                         style={{
-                          // Increased base scale to 1.2
-                          transform: `translate(calc(-50% + ${pos.x}px), calc(-50% + ${pos.y}px)) rotate(${pos.r}deg) scale(${isDragging ? 1.15 : 1.2})`,
-                          zIndex: isDragging ? 1000 : index,
+                          transform: `translate(calc(-50% + ${pos.x}px), calc(-50% + ${pos.y}px)) rotate(${pos.r}deg) scale(${scale})`,
+                          zIndex: isDragging ? 99999 : (isDropping ? 9999 : pos.z),
                           cursor: isDragging ? 'grabbing' : 'grab',
-                          transition: isDragging ? 'none' : 'transform 0.1s ease-out', // Snappy drag
+                          // If dropping, we use a 500ms transition for the "fall". 
+                          // If dragging, no transition for responsiveness.
+                          // Otherwise, standard hover/movement transition.
+                          transition: isDragging ? 'none' : (isDropping ? 'transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)' : 'transform 0.1s ease-out'), 
                         }}
                       >
                          <Tape 
@@ -505,10 +619,28 @@ export default function App() {
         )}
       </main>
 
-      <footer className="bg-black border-t border-neutral-800 p-2 text-[10px] text-neutral-600 flex justify-between font-mono uppercase shrink-0 z-10 relative">
-        <span>SYSTEM_STATUS: NOMINAL</span>
-        <span>PWR: 98%</span>
-        <span>API_LINK: {process.env.API_KEY ? 'ACTIVE' : 'OFFLINE'}</span>
+      <footer className="bg-black border-t border-neutral-800 p-2 text-[10px] text-neutral-600 flex justify-between items-center font-mono uppercase shrink-0 z-10 relative">
+        <div className="flex gap-4">
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            onChange={handleImportFile} 
+            accept=".json" 
+            className="hidden" 
+          />
+          <button onClick={handleImportClick} className="hover:text-amber-500 flex items-center gap-1">
+             <Upload size={10} /> 导入
+          </button>
+          <button onClick={handleExport} className="hover:text-amber-500 flex items-center gap-1">
+             <Download size={10} /> 导出
+          </button>
+        </div>
+        
+        <div className="flex gap-4">
+            <span>SYSTEM_STATUS: NOMINAL</span>
+            <span>PWR: 98%</span>
+            <span>API_LINK: {process.env.API_KEY ? 'ACTIVE' : 'OFFLINE'}</span>
+        </div>
       </footer>
     </div>
   );
