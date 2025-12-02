@@ -4,7 +4,8 @@ export interface DiaryEntry {
   content: string;
   timestamp: number;
   title?: string;
-  mood?: string;
+  mood?: string;       // AI generated mood text
+  moodId?: string;     // Explicit mood ID for avatar (happy, angry, etc.)
   tags?: string[];
   isAnalayzed: boolean;
   color?: string; // Tailwind class

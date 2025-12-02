@@ -4,7 +4,7 @@ import { Save, X } from 'lucide-react';
 import { sfx } from '../services/audioService';
 
 interface RecorderProps {
-  onSave: (title: string, content: string, color: string, emoji: string, author: string) => void;
+  onSave: (title: string, content: string, color: string, emoji: string, author: string, moodId: string) => void;
   onCancel: () => void;
   isProcessing: boolean;
 }
@@ -48,7 +48,10 @@ export const Recorder: React.FC<RecorderProps> = ({ onSave, onCancel, isProcessi
   }
 
   return (
-    <div className="flex flex-col h-full max-w-4xl mx-auto w-full p-4 relative justify-center">
+    <div 
+      onClick={(e) => e.stopPropagation()} 
+      className="flex flex-col h-full max-w-4xl mx-auto w-full p-4 relative justify-center"
+    >
       {/* Header / HUD */}
       <div className="flex justify-between items-end mb-4 border-b-2 border-orange-700/50 pb-2">
         <div>
@@ -142,7 +145,7 @@ export const Recorder: React.FC<RecorderProps> = ({ onSave, onCancel, isProcessi
         </div>
 
         <button 
-          onClick={() => onSave(title || 'UNTITLED', text, selectedMood.color, selectedMood.emoji, author || 'UNKNOWN')}
+          onClick={() => onSave(title || 'UNTITLED', text, selectedMood.color, selectedMood.emoji, author || 'UNKNOWN', selectedMood.id)}
           onMouseEnter={() => sfx.playHover()}
           disabled={!text.trim() || isProcessing}
           className={`

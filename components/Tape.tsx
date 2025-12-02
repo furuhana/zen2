@@ -27,7 +27,7 @@ export const Tape: React.FC<TapeProps> = ({ label, date, color = "bg-amber-600",
       onMouseEnter={() => !isPlaying && !isFlipped && sfx.playHover()}
       className={`
         relative group cursor-pointer w-[340px] h-52 
-        transition-all duration-500 ease-out
+        transition-transform duration-500 ease-in-out
         ${isFlipped ? 'rotate-y-180' : ''}
         ${className}
       `}
@@ -94,8 +94,8 @@ export const Tape: React.FC<TapeProps> = ({ label, date, color = "bg-amber-600",
             
           </div>
 
-          {/* A Side Marking - Moved to Bottom Left and Larger */}
-          <div className="absolute bottom-3 left-4 text-neutral-300 font-bold text-3xl opacity-50 font-mono">Ａ面</div>
+          {/* A Side Marking - Hiragana */}
+          <div className="absolute bottom-3 left-4 text-neutral-300 font-bold text-xl opacity-50 font-mono tracking-widest">おもて</div>
           <div className="absolute bottom-3 right-4 text-neutral-400 font-bold text-[10px] opacity-70">C-60</div>
 
           {/* Bottom Trapezoid (Head access) */}
@@ -125,8 +125,8 @@ export const Tape: React.FC<TapeProps> = ({ label, date, color = "bg-amber-600",
              <div className="w-full border-b border-black/20 mt-2"></div>
            </div>
            
-           {/* B Side Marking */}
-           <div className="absolute bottom-3 left-4 text-neutral-300 font-bold text-3xl opacity-50 font-mono">Ｂ面</div>
+           {/* B Side Marking - Hiragana */}
+           <div className="absolute bottom-3 left-4 text-neutral-300 font-bold text-xl opacity-50 font-mono tracking-widest">うら</div>
            
            {/* Bottom Trapezoid (Head access) */}
            <div className="absolute bottom-0 w-1/2 h-8 bg-neutral-800 border-t-2 border-l-2 border-r-2 border-neutral-600 rounded-t-lg shadow-sm z-20"></div>
