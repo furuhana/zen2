@@ -1,221 +1,244 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Download, Upload, NotebookPen, Search, FileJson } from 'lucide-react';
-import NoteCard from './components/NoteCard';
-import NoteModal from './components/NoteModal';
-import Button from './components/Button';
-import { Note, NoteFormData } from './types';
+import React, { useState, useEffect } from 'react';
+import { DiaryEntry, AppView } from './types';
+import { analyzeEntry } from './services/geminiService';
+import { Tape } from './components/Tape';
+import { Recorder } from './components/Recorder';
+import { Plus, Trash2, Rewind, Play, Pause, FastForward, ChevronLeft, Power, Cpu } from 'lucide-react';
 
-function App() {
-  const [notes, setNotes] = useState<Note[]>(() => {
-    try {
-      const saved = localStorage.getItem('zennotes-data');
-      return saved ? JSON.parse(saved) : [];
-    } catch (e) {
-      return [];
-    }
-  });
-  
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingNote, setEditingNote] = useState<Note | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+const STORAGE_KEY = 'retrolog_entries_v1';
 
+export default function App() {
+  const [entries, setEntries] = useState<DiaryEntry[]>([]);
+  const [view, setView] = useState<AppView>(AppView.LIBRARY);
+  const [currentEntryId, setCurrentEntryId] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [showIntro, setShowIntro] = useState(true);
+
+  // Load from local storage
   useEffect(() => {
-    localStorage.setItem('zennotes-data', JSON.stringify(notes));
-  }, [notes]);
-
-  const handleAddNote = () => {
-    setEditingNote(null);
-    setIsModalOpen(true);
-  };
-
-  const handleEditNote = (note: Note) => {
-    setEditingNote(note);
-    setIsModalOpen(true);
-  };
-
-  const handleDeleteNote = (id: string) => {
-    if (window.confirm('Are you sure you want to delete this note?')) {
-      setNotes(prev => prev.filter(n => n.id !== id));
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      setEntries(JSON.parse(saved));
     }
-  };
+    
+    // Simulate boot sequence
+    const timer = setTimeout(() => setShowIntro(false), 2000);
+    return () => clearTimeout(timer);
+  }, []);
 
-  const handleSaveNote = (data: NoteFormData) => {
-    if (editingNote) {
-      // Update existing
-      setNotes(prev => prev.map(n => 
-        n.id === editingNote.id 
-          ? { ...n, ...data, updatedAt: Date.now() } 
-          : n
-      ));
-    } else {
-      // Create new
-      const newNote: Note = {
-        id: crypto.randomUUID(),
-        ...data,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      };
-      setNotes(prev => [newNote, ...prev]);
-    }
-  };
+  // Save to local storage
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+  }, [entries]);
 
-  const handleExport = () => {
-    const dataStr = JSON.stringify(notes, null, 2);
-    const blob = new Blob([dataStr], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `zen-notes-${new Date().toISOString().slice(0, 10)}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  };
-
-  const handleImportTrigger = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleImportFile = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const result = JSON.parse(e.target?.result as string);
-        if (Array.isArray(result)) {
-            const validNotes = result.filter(n => n.id && n.title !== undefined && n.content !== undefined);
-            if (validNotes.length > 0) {
-                 const importedNotes: Note[] = validNotes.map((n: any) => ({
-                    id: crypto.randomUUID(),
-                    title: n.title || '',
-                    content: n.content || '',
-                    createdAt: n.createdAt || Date.now(),
-                    updatedAt: n.updatedAt || Date.now()
-                 }));
-                 
-                 setNotes(prev => [...importedNotes, ...prev]);
-                 alert(`Successfully imported ${importedNotes.length} notes.`);
-            } else {
-                alert('No valid notes found in this file.');
-            }
-        } else {
-            alert('Invalid file format. Expected a JSON array.');
-        }
-      } catch (err) {
-        alert('Failed to parse JSON file.');
-      }
-      if (fileInputRef.current) fileInputRef.current.value = '';
+  const handleSaveEntry = async (content: string) => {
+    setIsProcessing(true);
+    
+    const newEntry: DiaryEntry = {
+      id: Date.now().toString(),
+      content,
+      timestamp: Date.now(),
+      isAnalayzed: false,
+      title: 'PROCESSING...',
     };
-    reader.readAsText(file);
+
+    // Optimistic update
+    setEntries(prev => [newEntry, ...prev]);
+
+    // AI Analysis
+    try {
+      const analysis = await analyzeEntry(content);
+      
+      setEntries(prev => prev.map(entry => 
+        entry.id === newEntry.id 
+          ? { 
+              ...entry, 
+              title: analysis.title, 
+              mood: analysis.mood, 
+              tags: analysis.tags, 
+              isAnalayzed: true 
+            } 
+          : entry
+      ));
+    } catch (e) {
+      console.error("Analysis failed", e);
+      setEntries(prev => prev.map(entry => 
+        entry.id === newEntry.id 
+          ? { ...entry, title: 'UNTITLED_ERR', isAnalayzed: true } 
+          : entry
+      ));
+    } finally {
+      setIsProcessing(false);
+      setView(AppView.LIBRARY);
+    }
   };
 
-  const filteredNotes = notes.filter(note => 
-    note.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    note.content.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const handleDeleteEntry = (id: string) => {
+    if (confirm('ERASE MAGNETIC TAPE? THIS ACTION IS IRREVERSIBLE.')) {
+      setEntries(prev => prev.filter(e => e.id !== id));
+      if (currentEntryId === id) {
+        setView(AppView.LIBRARY);
+        setCurrentEntryId(null);
+      }
+    }
+  };
+
+  const formatDate = (timestamp: number) => {
+    const d = new Date(timestamp);
+    return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
+  };
+
+  const currentEntry = entries.find(e => e.id === currentEntryId);
+
+  // Intro Sequence
+  if (showIntro) {
+    return (
+      <div className="h-screen w-full flex items-center justify-center bg-black text-amber-500 font-mono flex-col gap-4">
+        <Cpu size={64} className="animate-pulse" />
+        <div className="text-2xl tracking-[0.5em] animate-pulse">BOOTING_SYSTEM</div>
+        <div className="text-xs text-amber-800">MEM_CHECK: OK | TAPE_DRIVE: MOUNTED</div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen pb-20 bg-gray-50 text-gray-900 font-sans">
+    <div className="min-h-screen w-full bg-[#111] text-amber-500 font-mono selection:bg-amber-900 selection:text-white flex flex-col">
       
-      {/* Header */}
-      <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-gray-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row md:items-center justify-between py-4 gap-4">
-            
-            {/* Logo */}
-            <div className="flex items-center gap-2">
-              <div className="bg-indigo-50 p-2 rounded-lg">
-                <NotebookPen className="w-6 h-6 text-primary" />
-              </div>
-              <h1 className="text-xl font-bold text-gray-800 tracking-tight">
-                ZenNotes
-              </h1>
-            </div>
-
-            {/* Actions */}
-            <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-              <div className="relative group flex-1 sm:flex-none">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Search className="h-4 w-4 text-gray-400 group-focus-within:text-primary transition-colors" />
-                </div>
-                <input
-                  type="text"
-                  placeholder="Search notes..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="block w-full sm:w-64 pl-10 pr-3 py-2 border border-gray-200 rounded-lg leading-5 bg-gray-50 text-gray-900 placeholder-gray-400 focus:outline-none focus:bg-white focus:border-indigo-300 focus:ring-1 focus:ring-indigo-300 transition-all sm:text-sm"
-                />
-              </div>
-
-              <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
-                <input 
-                    type="file" 
-                    ref={fileInputRef} 
-                    onChange={handleImportFile} 
-                    accept=".json" 
-                    className="hidden" 
-                />
-                
-                <Button variant="secondary" onClick={handleImportTrigger} icon={<Upload className="w-4 h-4"/>} title="Import JSON">
-                  Import
-                </Button>
-                <Button variant="secondary" onClick={handleExport} icon={<Download className="w-4 h-4"/>} title="Export JSON">
-                  Export
-                </Button>
-                <Button onClick={handleAddNote} icon={<Plus className="w-4 h-4"/>}>
-                  New Note
-                </Button>
-              </div>
-            </div>
+      {/* Top Bar / Deck Status */}
+      <header className="border-b border-amber-900/30 bg-[#0a0a0a] p-4 flex justify-between items-center sticky top-0 z-40 shadow-2xl">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 border-2 border-amber-600 rounded-sm flex items-center justify-center bg-amber-900/20">
+             <div className="w-4 h-4 bg-amber-500 rounded-full animate-pulse"></div>
           </div>
+          <h1 className="text-2xl font-bold tracking-tighter text-amber-500/90 hidden sm:block">RETROLOG <span className="text-xs align-top opacity-50">v1.0</span></h1>
         </div>
+
+        <div className="flex gap-4 text-xs tracking-widest text-amber-700">
+           <div>TAPES: {entries.length}</div>
+           <div className="hidden sm:block">MEM: {Math.floor(entries.length * 1.4)}KB</div>
+        </div>
+
+        {view === AppView.LIBRARY && (
+             <button 
+             onClick={() => setView(AppView.RECORDER)}
+             className="bg-amber-700 hover:bg-amber-600 text-black font-bold px-4 py-2 flex items-center gap-2 border-b-4 border-amber-900 active:border-b-0 active:translate-y-1 transition-all"
+           >
+             <Plus size={16} />
+             <span>NEW_TAPE</span>
+           </button>
+        )}
       </header>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Main Content Area */}
+      <main className="flex-1 p-4 md:p-8 overflow-y-auto relative">
         
-        {notes.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-24 text-center animate-in fade-in zoom-in-95 duration-500">
-            <div className="bg-white border border-gray-100 p-6 rounded-full mb-6 shadow-sm">
-                <NotebookPen className="w-12 h-12 text-indigo-200" />
-            </div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">No notes yet</h3>
-            <p className="text-gray-500 max-w-sm mb-8">
-              Capture your ideas, daily tasks, and creative thoughts in a distraction-free environment.
-            </p>
-            <Button onClick={handleAddNote} size="lg">
-              Create your first note
-            </Button>
-          </div>
-        ) : filteredNotes.length === 0 ? (
-           <div className="text-center py-24 text-gray-500">
-             No notes found matching "{searchQuery}"
-           </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredNotes.map((note) => (
-              <NoteCard
-                key={note.id}
-                note={note}
-                onEdit={handleEditNote}
-                onDelete={handleDeleteNote}
-              />
-            ))}
+        {view === AppView.LIBRARY && (
+          <div className="max-w-6xl mx-auto">
+            {entries.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-64 border-2 border-dashed border-neutral-800 rounded-lg text-neutral-600">
+                 <p className="mb-4">NO DATA FOUND ON DRIVE</p>
+                 <button 
+                   onClick={() => setView(AppView.RECORDER)}
+                   className="text-amber-600 hover:text-amber-500 underline underline-offset-4"
+                 >
+                   INSERT NEW TAPE
+                 </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                {entries.map((entry) => (
+                  <Tape 
+                    key={entry.id}
+                    label={entry.title || 'PROCESSING...'}
+                    date={formatDate(entry.timestamp)}
+                    color={["bg-amber-600", "bg-teal-600", "bg-orange-600", "bg-purple-600"][parseInt(entry.id.slice(-1)) % 4]}
+                    onClick={() => {
+                      setCurrentEntryId(entry.id);
+                      setView(AppView.PLAYER);
+                    }}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         )}
+
+        {view === AppView.RECORDER && (
+          <Recorder 
+            onSave={handleSaveEntry}
+            onCancel={() => setView(AppView.LIBRARY)}
+            isProcessing={isProcessing}
+          />
+        )}
+
+        {view === AppView.PLAYER && currentEntry && (
+          <div className="max-w-4xl mx-auto bg-neutral-900 border border-neutral-700 rounded-xl overflow-hidden shadow-2xl relative">
+             {/* Player Tape Visual */}
+             <div className="bg-[#1a1a1a] p-8 border-b-4 border-neutral-800 flex justify-center perspective-[1000px]">
+                <div className="transform rotate-x-12 scale-110">
+                  <Tape 
+                    label={currentEntry.title || 'UNTITLED'} 
+                    date={formatDate(currentEntry.timestamp)}
+                    color={["bg-amber-600", "bg-teal-600", "bg-orange-600", "bg-purple-600"][parseInt(currentEntry.id.slice(-1)) % 4]}
+                    isPlaying={true}
+                  />
+                </div>
+             </div>
+
+             {/* Output Screen */}
+             <div className="p-6 md:p-10 min-h-[300px] bg-black text-amber-500 font-mono text-lg leading-relaxed relative">
+               <div className="absolute top-2 right-2 flex gap-2">
+                 {currentEntry.mood && (
+                   <span className="px-2 py-1 border border-amber-800 text-xs uppercase text-amber-700">
+                     MOOD: {currentEntry.mood}
+                   </span>
+                 )}
+               </div>
+               
+               <div className="whitespace-pre-wrap">{currentEntry.content}</div>
+               
+               {currentEntry.tags && (
+                 <div className="mt-8 pt-4 border-t border-dashed border-neutral-800 flex gap-3 flex-wrap">
+                   {currentEntry.tags.map(tag => (
+                     <span key={tag} className="text-xs bg-neutral-800 text-neutral-400 px-2 py-1 rounded">#{tag}</span>
+                   ))}
+                 </div>
+               )}
+             </div>
+
+             {/* Controls */}
+             <div className="bg-neutral-800 p-4 border-t border-neutral-700 flex justify-between items-center">
+                <button 
+                  onClick={() => setView(AppView.LIBRARY)}
+                  className="flex items-center gap-2 text-neutral-400 hover:text-white transition-colors"
+                >
+                  <ChevronLeft /> BACK_TO_LIB
+                </button>
+
+                <div className="flex gap-4">
+                  <button className="p-3 bg-neutral-700 rounded shadow-md border-b-4 border-neutral-900 active:border-b-0 active:translate-y-1"><Rewind size={20} /></button>
+                  <button className="p-3 bg-amber-600 text-black rounded shadow-md border-b-4 border-amber-900 active:border-b-0 active:translate-y-1"><Pause size={20} /></button>
+                  <button className="p-3 bg-neutral-700 rounded shadow-md border-b-4 border-neutral-900 active:border-b-0 active:translate-y-1"><FastForward size={20} /></button>
+                </div>
+
+                <button 
+                  onClick={() => handleDeleteEntry(currentEntry.id)}
+                  className="text-red-900 hover:text-red-600 transition-colors p-2"
+                >
+                  <Trash2 size={20} />
+                </button>
+             </div>
+          </div>
+        )}
+
       </main>
 
-      <NoteModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSave={handleSaveNote}
-        initialData={editingNote}
-      />
+      {/* Footer / Status Line */}
+      <footer className="bg-black border-t border-neutral-800 p-2 text-[10px] text-neutral-600 flex justify-between font-mono uppercase">
+        <span>SYSTEM_STATUS: NOMINAL</span>
+        <span>PWR: 98%</span>
+        <span>API_LINK: {process.env.API_KEY ? 'ACTIVE' : 'OFFLINE'}</span>
+      </footer>
     </div>
   );
 }
-
-export default App;

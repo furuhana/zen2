@@ -1,10 +1,21 @@
-export interface Note {
+export interface DiaryEntry {
   id: string;
-  title: string;
   content: string;
-  createdAt: number;
-  updatedAt: number;
-  color?: string; // Optional nice-to-have for aesthetics
+  timestamp: number;
+  title?: string;
+  mood?: string;
+  tags?: string[];
+  isAnalayzed: boolean;
 }
 
-export type NoteFormData = Pick<Note, 'title' | 'content'>;
+export interface AnalysisResult {
+  title: string;
+  mood: string;
+  tags: string[];
+}
+
+export enum AppView {
+  LIBRARY = 'LIBRARY',
+  RECORDER = 'RECORDER',
+  PLAYER = 'PLAYER',
+}
