@@ -4,35 +4,47 @@ import { Save, X } from 'lucide-react';
 import { sfx } from '../services/audioService';
 
 interface RecorderProps {
-  onSave: (title: string, content: string) => void;
+  onSave: (title: string, content: string, color: string, emoji: string, author: string) => void;
   onCancel: () => void;
   isProcessing: boolean;
 }
 
+// 1 高兴、2 忧郁、3 悸动、4 愤怒、5、轻松、6 神秘
+const MOODS = [
+  { id: 'happy', color: 'bg-pink-500', emoji: '😄', label: 'HAPPY' },
+  { id: 'melancholy', color: 'bg-blue-600', emoji: '🌧️', label: 'MELANCHOLY' },
+  { id: 'throbbing', color: 'bg-amber-600', emoji: '💓', label: 'THROBBING' },
+  { id: 'angry', color: 'bg-red-700', emoji: '💢', label: 'ANGRY' },
+  { id: 'relaxed', color: 'bg-emerald-600', emoji: '🍃', label: 'RELAXED' },
+  { id: 'mysterious', color: 'bg-purple-600', emoji: '🔮', label: 'MYSTERIOUS' },
+];
+
 export const Recorder: React.FC<RecorderProps> = ({ onSave, onCancel, isProcessing }) => {
   const [text, setText] = useState('');
   const [title, setTitle] = useState('');
+  const [author, setAuthor] = useState('');
+  const [selectedMood, setSelectedMood] = useState(MOODS[2]); // Default to Throbbing/Excited
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    // Focus title first if empty
     if (textareaRef.current) {
       textareaRef.current.focus();
     }
   }, []);
 
   const handleTyping = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    if (e.target.value.length > text.length) {
-      sfx.playKeyStroke();
-    } else {
-       sfx.playKeyStroke();
-    }
+    sfx.playKeyStroke();
     setText(e.target.value);
   };
 
-  const handleTitleTyping = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputTyping = (setter: React.Dispatch<React.SetStateAction<string>>) => (e: React.ChangeEvent<HTMLInputElement>) => {
     sfx.playKeyStroke();
-    setTitle(e.target.value);
+    setter(e.target.value);
+  }
+
+  const handleMoodSelect = (mood: typeof MOODS[0]) => {
+    sfx.playClick();
+    setSelectedMood(mood);
   }
 
   return (
@@ -51,17 +63,47 @@ export const Recorder: React.FC<RecorderProps> = ({ onSave, onCancel, isProcessi
         </div>
       </div>
 
-      {/* Title Input - Label Maker Style */}
-      <div className="mb-4 bg-neutral-900 border border-orange-900/50 p-2 flex items-center gap-4">
-        <span className="text-orange-500 font-bold text-sm tracking-widest shrink-0">LABEL:</span>
-        <input 
-          type="text" 
-          value={title}
-          onChange={handleTitleTyping}
-          maxLength={30}
-          className="flex-1 bg-transparent border-b-2 border-dashed border-neutral-700 text-white font-mono text-xl focus:border-orange-500 outline-none uppercase tracking-widest placeholder-neutral-700"
-          placeholder="ENTER_TAPE_TITLE"
-        />
+      <div className="flex gap-4 mb-4 flex-col sm:flex-row">
+        <div className="flex flex-1 gap-4">
+             {/* Title Input */}
+            <div className="bg-neutral-900 border border-orange-900/50 p-2 flex items-center gap-2 flex-1">
+            <span className="text-orange-500 font-bold text-xs tracking-widest shrink-0">LABEL:</span>
+            <input 
+                type="text" 
+                value={title}
+                onChange={handleInputTyping(setTitle)}
+                maxLength={20}
+                className="w-full bg-transparent border-b border-dashed border-neutral-700 text-white font-mono text-lg focus:border-orange-500 outline-none uppercase tracking-widest placeholder-neutral-800"
+                placeholder="UNTITLED"
+            />
+            </div>
+            {/* Author Input */}
+            <div className="bg-neutral-900 border border-orange-900/50 p-2 flex items-center gap-2 flex-1">
+            <span className="text-orange-500 font-bold text-xs tracking-widest shrink-0">AUTHOR:</span>
+            <input 
+                type="text" 
+                value={author}
+                onChange={handleInputTyping(setAuthor)}
+                maxLength={10}
+                className="w-full bg-transparent border-b border-dashed border-neutral-700 text-white font-mono text-lg focus:border-orange-500 outline-none uppercase tracking-widest placeholder-neutral-800"
+                placeholder="OPERATOR"
+            />
+            </div>
+        </div>
+
+        {/* Mood Selector */}
+        <div className="bg-neutral-900 border border-orange-900/50 p-2 flex items-center gap-2">
+           {MOODS.map(mood => (
+             <button
+               key={mood.id}
+               onClick={() => handleMoodSelect(mood)}
+               className={`w-8 h-8 rounded-sm flex items-center justify-center transition-all ${mood.color} ${selectedMood.id === mood.id ? 'ring-2 ring-white scale-110 z-10' : 'opacity-60 hover:opacity-100 hover:scale-105'}`}
+               title={mood.label}
+             >
+               <span className="text-sm shadow-black drop-shadow-md">{mood.emoji}</span>
+             </button>
+           ))}
+        </div>
       </div>
 
       {/* Terminal Input */}
@@ -100,7 +142,7 @@ export const Recorder: React.FC<RecorderProps> = ({ onSave, onCancel, isProcessi
         </div>
 
         <button 
-          onClick={() => onSave(title || 'UNTITLED', text)}
+          onClick={() => onSave(title || 'UNTITLED', text, selectedMood.color, selectedMood.emoji, author || 'UNKNOWN')}
           onMouseEnter={() => sfx.playHover()}
           disabled={!text.trim() || isProcessing}
           className={`

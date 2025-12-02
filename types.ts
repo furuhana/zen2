@@ -7,6 +7,9 @@ export interface DiaryEntry {
   mood?: string;
   tags?: string[];
   isAnalayzed: boolean;
+  color?: string; // Tailwind class
+  emoji?: string;
+  author?: string;
 }
 
 export interface AnalysisResult {
