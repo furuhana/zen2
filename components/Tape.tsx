@@ -95,7 +95,7 @@ export const Tape: React.FC<TapeProps> = ({ label, date, color = "bg-amber-600",
           </div>
 
           {/* A Side Marking - Moved to Bottom Left and Larger */}
-          <div className="absolute bottom-3 left-4 text-neutral-300 font-bold text-4xl opacity-50 font-mono">A</div>
+          <div className="absolute bottom-3 left-4 text-neutral-300 font-bold text-3xl opacity-50 font-mono">Ａ面</div>
           <div className="absolute bottom-3 right-4 text-neutral-400 font-bold text-[10px] opacity-70">C-60</div>
 
           {/* Bottom Trapezoid (Head access) */}
@@ -126,7 +126,7 @@ export const Tape: React.FC<TapeProps> = ({ label, date, color = "bg-amber-600",
            </div>
            
            {/* B Side Marking */}
-           <div className="absolute bottom-3 left-4 text-neutral-300 font-bold text-4xl opacity-50 font-mono">B</div>
+           <div className="absolute bottom-3 left-4 text-neutral-300 font-bold text-3xl opacity-50 font-mono">Ｂ面</div>
            
            {/* Bottom Trapezoid (Head access) */}
            <div className="absolute bottom-0 w-1/2 h-8 bg-neutral-800 border-t-2 border-l-2 border-r-2 border-neutral-600 rounded-t-lg shadow-sm z-20"></div>

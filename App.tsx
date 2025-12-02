@@ -270,7 +270,7 @@ export default function App() {
           <div className="w-8 h-8 border-2 border-amber-600 rounded-sm flex items-center justify-center bg-amber-900/20">
              <div className="w-4 h-4 bg-amber-500 rounded-full animate-pulse"></div>
           </div>
-          <h1 className="text-2xl font-bold tracking-tighter text-amber-500/90 hidden sm:block">RETROLOG <span className="text-xs align-top opacity-50">v1.4</span></h1>
+          <h1 className="text-2xl font-bold tracking-tighter text-amber-500/90 hidden sm:block">レトロログ <span className="text-xs align-top opacity-50">未来派日记 v1.4</span></h1>
         </div>
 
         <div className="flex gap-4 text-xs tracking-widest text-amber-700 items-center">
@@ -286,7 +286,7 @@ export default function App() {
              className="bg-amber-700 hover:bg-amber-600 text-black font-bold px-4 py-2 flex items-center gap-2 border-b-4 border-amber-900 active:border-b-0 active:translate-y-1 transition-all"
            >
              <Plus size={16} />
-             <span>NEW_TAPE</span>
+             <span>新建磁带</span>
            </button>
         )}
       </header>
@@ -304,7 +304,7 @@ export default function App() {
                    onMouseEnter={() => sfx.playHover()}
                    className="text-amber-600 hover:text-amber-500 underline underline-offset-4"
                  >
-                   INSERT NEW TAPE
+                   插入新磁带
                  </button>
               </div>
             ) : (
@@ -412,7 +412,7 @@ export default function App() {
                     onMouseEnter={() => sfx.playHover()}
                     className="flex items-center gap-2 text-neutral-400 hover:text-white transition-colors text-sm"
                   >
-                    <ChevronLeft size={16} /> EJECT
+                    <ChevronLeft size={16} /> 弹出
                   </button>
 
                   <div className="flex gap-4">

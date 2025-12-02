@@ -55,11 +55,11 @@ export const Recorder: React.FC<RecorderProps> = ({ onSave, onCancel, isProcessi
           <h2 className="text-3xl text-orange-500 font-bold uppercase tracking-widest drop-shadow-[0_0_8px_rgba(249,115,22,0.8)]">
             REC_MODE
           </h2>
-          <p className="text-xs text-orange-400/70 mt-1">INPUT_STREAM: KEYBOARD_MATRIX_01</p>
+          <p className="text-xs text-orange-400/70 mt-1">入力ストリーム: KEYBOARD_MATRIX_01</p>
         </div>
         <div className="flex items-center gap-2">
            <div className="w-3 h-3 rounded-full bg-red-600 animate-pulse shadow-[0_0_10px_red]"></div>
-           <span className="text-red-500 font-bold">RECORDING</span>
+           <span className="text-red-500 font-bold">録音中</span>
         </div>
       </div>
 
@@ -67,7 +67,7 @@ export const Recorder: React.FC<RecorderProps> = ({ onSave, onCancel, isProcessi
         <div className="flex flex-1 gap-4">
              {/* Title Input */}
             <div className="bg-neutral-900 border border-orange-900/50 p-2 flex items-center gap-2 flex-1">
-            <span className="text-orange-500 font-bold text-xs tracking-widest shrink-0">LABEL:</span>
+            <span className="text-orange-500 font-bold text-xs tracking-widest shrink-0">标题:</span>
             <input 
                 type="text" 
                 value={title}
@@ -79,7 +79,7 @@ export const Recorder: React.FC<RecorderProps> = ({ onSave, onCancel, isProcessi
             </div>
             {/* Author Input */}
             <div className="bg-neutral-900 border border-orange-900/50 p-2 flex items-center gap-2 flex-1">
-            <span className="text-orange-500 font-bold text-xs tracking-widest shrink-0">AUTHOR:</span>
+            <span className="text-orange-500 font-bold text-xs tracking-widest shrink-0">记录员:</span>
             <input 
                 type="text" 
                 value={author}
@@ -133,7 +133,7 @@ export const Recorder: React.FC<RecorderProps> = ({ onSave, onCancel, isProcessi
           className="group flex items-center gap-2 px-6 py-3 bg-neutral-800 border-b-4 border-neutral-950 text-neutral-400 font-bold hover:bg-neutral-700 hover:text-white active:border-b-0 active:translate-y-1 transition-all disabled:opacity-50"
         >
           <X size={18} />
-          <span>EJECT</span>
+          <span>弹出</span>
         </button>
 
         <div className="hidden sm:block h-2 w-32 bg-neutral-800 rounded-full overflow-hidden border border-neutral-700">
@@ -158,7 +158,7 @@ export const Recorder: React.FC<RecorderProps> = ({ onSave, onCancel, isProcessi
           ) : (
             <>
               <Save size={18} />
-              <span>SAVE_TAPE</span>
+              <span>保存磁带</span>
             </>
           )}
         </button>
