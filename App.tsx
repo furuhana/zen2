@@ -35,7 +35,7 @@ function App() {
   };
 
   const handleDeleteNote = (id: string) => {
-    if (window.confirm('Are you sure you want to delete this memory?')) {
+    if (window.confirm('Are you sure you want to delete this note?')) {
       setNotes(prev => prev.filter(n => n.id !== id));
     }
   };
@@ -66,7 +66,7 @@ function App() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `dream-log-${new Date().toISOString().slice(0, 10)}.json`;
+    link.download = `zen-notes-${new Date().toISOString().slice(0, 10)}.json`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -97,15 +97,15 @@ function App() {
                  }));
                  
                  setNotes(prev => [...importedNotes, ...prev]);
-                 alert(`Successfully recovered ${importedNotes.length} memories.`);
+                 alert(`Successfully imported ${importedNotes.length} notes.`);
             } else {
-                alert('No valid memories found in this file.');
+                alert('No valid notes found in this file.');
             }
         } else {
-            alert('Invalid format: Must be an array.');
+            alert('Invalid file format. Expected a JSON array.');
         }
       } catch (err) {
-        alert('Failed to parse file.');
+        alert('Failed to parse JSON file.');
       }
       if (fileInputRef.current) fileInputRef.current.value = '';
     };
@@ -118,23 +118,20 @@ function App() {
   );
 
   return (
-    <div className="min-h-screen pb-20 bg-void text-gray-300 font-sans selection:bg-dream-yellow/30 selection:text-dream-yellow relative overflow-x-hidden">
-      
-      {/* Dreamcore Noise Overlay */}
-      <div className="pointer-events-none fixed inset-0 z-[100] opacity-[0.06] bg-[url('https://grainy-gradients.vercel.app/noise.svg')] mix-blend-overlay"></div>
+    <div className="min-h-screen pb-20 bg-gray-50 text-gray-900 font-sans">
       
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-void/80 backdrop-blur-md border-b border-dream-yellow/20 shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
+      <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-gray-200 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row md:items-center justify-between py-5 gap-4">
+          <div className="flex flex-col md:flex-row md:items-center justify-between py-4 gap-4">
             
             {/* Logo */}
-            <div className="flex items-center gap-3">
-              <div className="bg-transparent border border-dream-yellow p-2 rounded-none shadow-[0_0_15px_rgba(251,191,36,0.2)]">
-                <NotebookPen className="w-6 h-6 text-dream-yellow" />
+            <div className="flex items-center gap-2">
+              <div className="bg-indigo-50 p-2 rounded-lg">
+                <NotebookPen className="w-6 h-6 text-primary" />
               </div>
-              <h1 className="text-2xl font-bold text-dream-yellow tracking-widest uppercase drop-shadow-[0_0_8px_rgba(251,191,36,0.6)]">
-                DreamNotes
+              <h1 className="text-xl font-bold text-gray-800 tracking-tight">
+                ZenNotes
               </h1>
             </div>
 
@@ -142,14 +139,14 @@ function App() {
             <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
               <div className="relative group flex-1 sm:flex-none">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Search className="h-4 w-4 text-gray-600 group-focus-within:text-dream-yellow transition-colors" />
+                  <Search className="h-4 w-4 text-gray-400 group-focus-within:text-primary transition-colors" />
                 </div>
                 <input
                   type="text"
-                  placeholder="Search memories..."
+                  placeholder="Search notes..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="block w-full sm:w-64 pl-10 pr-3 py-2 border border-dream-yellow/30 rounded-lg leading-5 bg-surface text-gray-200 placeholder-gray-600 focus:outline-none focus:bg-surface focus:border-dream-yellow focus:ring-1 focus:ring-dream-yellow transition-all sm:text-sm"
+                  className="block w-full sm:w-64 pl-10 pr-3 py-2 border border-gray-200 rounded-lg leading-5 bg-gray-50 text-gray-900 placeholder-gray-400 focus:outline-none focus:bg-white focus:border-indigo-300 focus:ring-1 focus:ring-indigo-300 transition-all sm:text-sm"
                 />
               </div>
 
@@ -169,7 +166,7 @@ function App() {
                   Export
                 </Button>
                 <Button onClick={handleAddNote} icon={<Plus className="w-4 h-4"/>}>
-                  New Entry
+                  New Note
                 </Button>
               </div>
             </div>
@@ -178,27 +175,27 @@ function App() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         
         {notes.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-32 text-center animate-in fade-in zoom-in-95 duration-700">
-            <div className="bg-surface border border-dream-yellow/20 p-8 rounded-full mb-8 shadow-[0_0_40px_rgba(251,191,36,0.05)]">
-                <FileJson className="w-16 h-16 text-dream-yellow/50" />
+          <div className="flex flex-col items-center justify-center py-24 text-center animate-in fade-in zoom-in-95 duration-500">
+            <div className="bg-white border border-gray-100 p-6 rounded-full mb-6 shadow-sm">
+                <NotebookPen className="w-12 h-12 text-indigo-200" />
             </div>
-            <h3 className="text-2xl font-bold text-dream-yellow mb-3 tracking-wide">VOID DETECTED</h3>
-            <p className="text-gray-500 max-w-sm mb-8 leading-relaxed">
-              No memories found in this sector. <br/>Start logging your dreams or retrieve lost data.
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">No notes yet</h3>
+            <p className="text-gray-500 max-w-sm mb-8">
+              Capture your ideas, daily tasks, and creative thoughts in a distraction-free environment.
             </p>
-            <Button onClick={handleAddNote} size="lg" className="px-10 py-3 uppercase tracking-widest text-sm">
-              Initialize Log
+            <Button onClick={handleAddNote} size="lg">
+              Create your first note
             </Button>
           </div>
         ) : filteredNotes.length === 0 ? (
-           <div className="text-center py-32 text-gray-600 font-mono">
-             Query "{searchQuery}" yielded no results in memory banks.
+           <div className="text-center py-24 text-gray-500">
+             No notes found matching "{searchQuery}"
            </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 auto-rows-max">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {filteredNotes.map((note) => (
               <NoteCard
                 key={note.id}

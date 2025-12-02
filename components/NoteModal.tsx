@@ -31,21 +31,17 @@ const NoteModal: React.FC<NoteModalProps> = ({ isOpen, onClose, onSave, initialD
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md transition-opacity animate-in fade-in duration-300">
-      <div className="bg-surface border border-dream-yellow/30 w-full max-w-lg shadow-[0_0_50px_rgba(251,191,36,0.1)] overflow-hidden animate-in zoom-in-95 duration-300 rounded-lg relative">
-        
-        {/* Glow effect at top */}
-        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-dream-yellow to-transparent opacity-50"></div>
-
-        <div className="flex items-center justify-between px-6 py-4 border-b border-dream-yellow/10">
-          <h2 className="text-xl font-bold text-dream-yellow tracking-widest uppercase">
-            {initialData ? 'EDIT MEMORY' : 'NEW ENTRY'}
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/20 backdrop-blur-sm transition-opacity animate-in fade-in duration-200">
+      <div className="bg-white w-full max-w-lg shadow-xl rounded-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <h2 className="text-xl font-semibold text-gray-800">
+            {initialData ? 'Edit Note' : 'New Note'}
           </h2>
           <button 
             onClick={onClose}
-            className="text-gray-500 hover:text-dream-yellow p-1 rounded-full hover:bg-dream-yellow/10 transition-colors"
+            className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100 transition-colors"
           >
-            <X className="w-6 h-6" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
@@ -53,29 +49,29 @@ const NoteModal: React.FC<NoteModalProps> = ({ isOpen, onClose, onSave, initialD
           <div className="mb-4">
             <input
               type="text"
-              placeholder="SUBJECT..."
+              placeholder="Title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full text-lg font-bold text-gray-200 placeholder:text-gray-700 border-b border-gray-800 focus:border-dream-yellow outline-none bg-transparent transition-colors py-2"
+              className="w-full text-lg font-bold text-gray-900 placeholder:text-gray-400 border-none outline-none bg-transparent"
               autoFocus
             />
           </div>
           
           <div className="mb-6">
             <textarea
-              placeholder="Record your thoughts here..."
+              placeholder="Write your thoughts..."
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              className="w-full h-64 resize-none text-gray-300 placeholder:text-gray-700 border-none outline-none bg-transparent leading-relaxed custom-scrollbar selection:bg-dream-yellow/30 selection:text-dream-yellow"
+              className="w-full h-64 resize-none text-gray-700 placeholder:text-gray-400 border-none outline-none bg-transparent leading-relaxed custom-scrollbar"
             />
           </div>
 
-          <div className="flex justify-end gap-3 pt-2 border-t border-dream-yellow/10">
+          <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
             <Button type="button" variant="ghost" onClick={onClose}>
-              DISCARD
+              Cancel
             </Button>
             <Button type="submit" icon={<Save className="w-4 h-4" />}>
-              SAVE MEMORY
+              Save Note
             </Button>
           </div>
         </form>
