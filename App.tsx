@@ -11,15 +11,14 @@ import { Plus, Trash2, Rewind, Play, Pause, FastForward, ChevronLeft, Cpu, Volum
 const STORAGE_KEY = 'retrolog_entries_v1';
 const POSITIONS_KEY = 'retrolog_positions_v1';
 
-// Helper for random number
+// Helper for random number - Improved for better distribution
 const seededRandom = (seed: string) => {
   let h = 0x811c9dc5;
   for (let i = 0; i < seed.length; i++) {
     h ^= seed.charCodeAt(i);
     h = Math.imul(h, 0x01000193);
   }
-  h >>>= 0;
-  return (h % 100) / 100;
+  return (h >>> 0) / 4294967296; // Full 0-1 float range
 };
 
 interface Position {
@@ -38,6 +37,7 @@ export default function App() {
   // Layout & Dragging State
   const [tapePositions, setTapePositions] = useState<Record<string, Position>>({});
   const [dragState, setDragState] = useState<{ id: string, startX: number, startY: number, initialX: number, initialY: number } | null>(null);
+  const isDraggingRef = useRef(false); // Track if a move actually happened
   const libraryRef = useRef<HTMLDivElement>(null);
   
   // Player specific state
@@ -86,8 +86,8 @@ export default function App() {
     let hasChanges = false;
 
     // Use a larger spread area for initialization
-    const spreadW = Math.min(window.innerWidth * 0.8, 1200); 
-    const spreadH = Math.min(window.innerHeight * 0.8, 800);
+    const spreadW = Math.min(window.innerWidth * 0.9, 1400); 
+    const spreadH = Math.min(window.innerHeight * 0.9, 900);
 
     entries.forEach(entry => {
       if (!newPositions[entry.id]) {
@@ -98,7 +98,8 @@ export default function App() {
         newPositions[entry.id] = {
           x: (rngX * spreadW) - (spreadW / 2),
           y: (rngY * spreadH) - (spreadH / 2),
-          r: (rngRot * 40) - 20
+          // Range: -40 to +40 degrees (Varied but under 45 limit)
+          r: (rngRot * 80) - 40 
         };
         hasChanges = true;
       }
@@ -113,6 +114,8 @@ export default function App() {
   const handleMouseDown = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     if (view !== AppView.LIBRARY) return;
+    
+    isDraggingRef.current = false; // Reset drag flag
     
     const pos = tapePositions[id] || { x: 0, y: 0, r: 0 };
     setDragState({
@@ -130,6 +133,11 @@ export default function App() {
     const dx = e.clientX - dragState.startX;
     const dy = e.clientY - dragState.startY;
 
+    // Check if moved significantly to consider it a drag
+    if (Math.hypot(dx, dy) > 5) {
+        isDraggingRef.current = true;
+    }
+
     setTapePositions(prev => ({
       ...prev,
       [dragState.id]: {
@@ -142,6 +150,18 @@ export default function App() {
 
   const handleMouseUp = () => {
     setDragState(null);
+  };
+
+  const onTapeClick = (entry: DiaryEntry) => {
+      if (isDraggingRef.current) return; // Ignore click if dragging occurred
+
+      sfx.playClick();
+      sfx.playInsertTape();
+      setCurrentEntryId(entry.id);
+      setIsPlayingMusic(true);
+      setTypedContent(''); 
+      setSlideDirection('in');
+      setView(AppView.PLAYER);
   };
 
   // --- Audio Loop ---
@@ -320,14 +340,8 @@ export default function App() {
         .backlight-pulse { animation: backLightPulse 4s infinite ease-in-out; }
       `}</style>
       
-      {/* Background */}
-      <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-purple-900/10 rounded-full blur-[100px]"></div>
-        <div className="absolute bottom-[-20%] right-[-10%] w-[60%] h-[60%] bg-amber-900/10 rounded-full blur-[120px]"></div>
-      </div>
-
-      {/* Top Bar */}
-      <header className="border-b border-amber-900/30 bg-[#0a0a0a]/90 backdrop-blur-sm p-4 flex justify-between items-center sticky top-0 z-40 shadow-2xl shrink-0">
+      {/* Top Bar - Fixed height (h-20) to prevent jumping */}
+      <header className="h-20 border-b border-amber-900/30 bg-[#0a0a0a]/90 backdrop-blur-sm p-4 flex justify-between items-center sticky top-0 z-40 shadow-2xl shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 border-2 border-amber-600 rounded-sm flex items-center justify-center bg-amber-900/20">
              <div className="w-4 h-4 bg-amber-500 rounded-full animate-pulse"></div>
@@ -357,7 +371,7 @@ export default function App() {
       <main className="flex-1 overflow-hidden relative flex flex-col z-10">
         
         {view === AppView.LIBRARY && (
-          <div ref={libraryRef} className="flex-1 w-full h-full p-8 relative overflow-hidden bg-radial-gradient">
+          <div ref={libraryRef} className="flex-1 w-full h-full p-8 relative overflow-hidden">
             {entries.length === 0 ? (
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                 <div className="flex flex-col items-center justify-center h-64 border-2 border-dashed border-neutral-800 rounded-lg text-neutral-600 w-full max-w-lg backdrop-blur-sm bg-black/20 pointer-events-auto">
@@ -382,7 +396,8 @@ export default function App() {
                         className="absolute top-1/2 left-1/2 transition-shadow duration-300"
                         onMouseDown={(e) => handleMouseDown(e, entry.id)}
                         style={{
-                          transform: `translate(calc(-50% + ${pos.x}px), calc(-50% + ${pos.y}px)) rotate(${pos.r}deg) scale(${isDragging ? 0.9 : 1})`,
+                          // Increased base scale to 1.2
+                          transform: `translate(calc(-50% + ${pos.x}px), calc(-50% + ${pos.y}px)) rotate(${pos.r}deg) scale(${isDragging ? 1.15 : 1.2})`,
                           zIndex: isDragging ? 1000 : index,
                           cursor: isDragging ? 'grabbing' : 'grab',
                           transition: isDragging ? 'none' : 'transform 0.1s ease-out', // Snappy drag
@@ -396,17 +411,7 @@ export default function App() {
                           author={entry.author}
                           isAnalyzing={!entry.isAnalayzed}
                           className={`${isDragging ? 'shadow-2xl' : 'shadow-[0_5px_15px_rgba(0,0,0,0.5)]'}`}
-                          onClick={() => {
-                            if (!isDragging) {
-                              sfx.playClick();
-                              sfx.playInsertTape();
-                              setCurrentEntryId(entry.id);
-                              setIsPlayingMusic(true);
-                              setTypedContent(''); 
-                              setSlideDirection('in');
-                              setView(AppView.PLAYER);
-                            }
-                          }}
+                          onClick={() => onTapeClick(entry)}
                         />
                       </div>
                     );
@@ -438,8 +443,9 @@ export default function App() {
               onClick={(e) => e.stopPropagation()} 
               className="max-w-4xl w-full bg-neutral-900 border border-neutral-700 rounded-xl overflow-hidden shadow-2xl relative animate-[fadeIn_0.5s_ease-out] cursor-auto"
             >
-              <div className="bg-[#1a1a1a] p-8 border-b-4 border-neutral-800 flex justify-center perspective-[1000px] overflow-visible relative min-h-[300px] items-center">
-                  <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full blur-[100px] opacity-40 backlight-pulse z-0 ${currentEntry.color?.replace('bg-', 'bg-')}`}></div>
+              {/* Reduced tape section height from 300 to 260px */}
+              <div className="bg-[#1a1a1a] p-8 border-b-4 border-neutral-800 flex justify-center perspective-[1000px] overflow-visible relative min-h-[260px] items-center">
+                  <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] rounded-full blur-[100px] opacity-40 backlight-pulse z-0 ${currentEntry.color?.replace('bg-', 'bg-')}`}></div>
                   <div className={`transform transition-all duration-300 relative z-10 ${slideDirection === 'left' ? 'slide-left' : ''} ${slideDirection === 'right' ? 'slide-right' : ''} ${slideDirection === 'in' ? 'slide-in' : ''}`}>
                      <div className="cute-wobble">
                         <Tape 
@@ -459,11 +465,14 @@ export default function App() {
                   </div>
               </div>
 
-              <div className="p-6 md:p-10 min-h-[300px] bg-black text-amber-500 font-mono text-lg leading-relaxed relative border-b border-neutral-800">
-                <div className="absolute top-2 right-2 flex gap-2">
-                  {currentEntry.mood && <span className="px-2 py-1 border border-amber-800 text-xs uppercase text-amber-700">MOOD: {currentEntry.mood}</span>}
-                </div>
+              {/* Reduced content area height from 350px to 240px */}
+              <div className="p-6 md:p-8 h-[240px] overflow-y-auto bg-black text-amber-500 font-mono text-lg leading-relaxed relative border-b border-neutral-800">
                 <div className="whitespace-pre-wrap relative z-10">
+                  {currentEntry.mood && (
+                    <span className="float-right ml-5 mb-2 px-2 py-1 border border-amber-800 text-xs uppercase text-amber-700 select-none">
+                      MOOD: {currentEntry.mood}
+                    </span>
+                  )}
                   {typedContent}<span className="inline-block w-2 h-5 bg-amber-500 animate-pulse ml-1 align-middle"></span>
                 </div>
                 {/* Avatar */}
@@ -476,7 +485,7 @@ export default function App() {
                     />
                 </div>
                 {currentEntry.tags && (
-                  <div className="mt-8 pt-4 border-t border-dashed border-neutral-800 flex gap-3 flex-wrap relative z-10">
+                  <div className="mt-8 pt-4 border-t border-dashed border-neutral-800 flex gap-3 flex-wrap relative z-10 clear-both">
                     {currentEntry.tags.map(tag => <span key={tag} className="text-xs bg-neutral-800 text-neutral-400 px-2 py-1 rounded">#{tag}</span>)}
                   </div>
                 )}

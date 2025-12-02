@@ -26,7 +26,7 @@ export const Tape: React.FC<TapeProps> = ({ label, date, color = "bg-amber-600",
       }}
       onMouseEnter={() => !isPlaying && !isFlipped && sfx.playHover()}
       className={`
-        relative group cursor-pointer w-[340px] h-52 
+        relative group cursor-pointer w-[330px] h-[200px] 
         transition-transform duration-500 ease-in-out
         ${isFlipped ? 'rotate-y-180' : ''}
         ${className}
