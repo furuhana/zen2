@@ -1,0 +1,38 @@
+<script type="importmap">
+{
+  "imports": {
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.555.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/"
+  }
+}
+</script>
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ZenNotes</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              // Dreamcore / Cyber Palette
+              void: '#050505',      // Almost pure black
+              surface: '#121212',   // Dark surface
+              dream: {
+                yellow: '#fbbf24',  // Amber 400 - Warm nostalgic yellow
+                glow: '#f59e0b',    // Amber 500 - For shadows
+                dim: '#525252',     // Neutral 600
+              }
+            },
+            animation: {
+              'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            }
+          }
+        }
+      <link rel="stylesheet" href="/index.css">
+<script type="module" src="/index.tsx"></script>
