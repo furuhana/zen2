@@ -502,6 +502,14 @@ export default function App() {
         .animate-drop-in { animation: dropIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
       `}</style>
       
+      {/* Global CRT Effects moved from index.html */}
+      <div className="scanlines"></div>
+      <div 
+        className="scan-bar" 
+        style={{ opacity: view === AppView.LIBRARY ? 0.8 : 0.5 }}
+      ></div>
+      <div className="screen-glow"></div>
+      
       {/* Background Layer */}
       <ContainerBackground />
       

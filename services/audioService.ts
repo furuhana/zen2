@@ -14,8 +14,8 @@ export class AudioService {
   private lobbyNodes: AudioNode[] = [];
   private lobbyGain: GainNode | null = null;
   
-  // New File-based Lobby Music
-  private lobbyUrl = 'https://raw.githubusercontent.com/furuhana/zen2/refs/heads/main/sy3.wav';
+  // New File-based Lobby Music - Fixed URL structure
+  private lobbyUrl = 'https://raw.githubusercontent.com/furuhana/zen2/main/sy3.wav';
   private lobbyBuffer: AudioBuffer | null = null;
   private lobbySource: AudioBufferSourceNode | null = null;
   private isLobbyLoading: boolean = false;
@@ -275,8 +275,6 @@ export class AudioService {
     this.init();
     
     // FORCE RESUME: Browsers block audio until interaction.
-    // This method is called from App.tsx mostly, which can happen on load.
-    // If context is suspended, sound won't play until we resume.
     if (this.ctx && this.ctx.state === 'suspended') {
       try {
         await this.ctx.resume();
@@ -295,7 +293,9 @@ export class AudioService {
     if (!this.lobbyBuffer && !this.isLobbyLoading) {
         this.isLobbyLoading = true;
         try {
+            console.log("Loading lobby music from:", this.lobbyUrl);
             const response = await fetch(this.lobbyUrl);
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
             const arrayBuffer = await response.arrayBuffer();
             this.lobbyBuffer = await this.ctx.decodeAudioData(arrayBuffer);
             this.isLobbyLoading = false;
@@ -304,7 +304,7 @@ export class AudioService {
                 this.playLobbyBuffer();
             }
         } catch (error) {
-            console.error("Failed to load lobby music", error);
+            console.error("Failed to load lobby music:", error);
             this.isLobbyLoading = false;
         }
     } else if (this.lobbyBuffer) {

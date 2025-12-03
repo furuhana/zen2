@@ -19,7 +19,7 @@
         overflow: hidden; /* Prevent body scroll, handle in app */
       }
       
-      /* CRT Scanline Effect */
+      /* CRT Scanline Effect (Static) */
       .scanlines {
         background: linear-gradient(
           to bottom,
@@ -36,6 +36,25 @@
         bottom: 0;
         left: 0;
         z-index: 50;
+      }
+
+      /* Moving Scan Bar */
+      .scan-bar {
+        width: 100%;
+        height: 8px;
+        background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0.05) 50%, rgba(255,255,255,0));
+        position: fixed;
+        left: 0;
+        top: 0;
+        z-index: 52;
+        pointer-events: none;
+        animation: scan 5s linear infinite;
+        transition: opacity 0.5s ease; /* Smooth transition for opacity changes */
+      }
+
+      @keyframes scan {
+        0% { transform: translateY(-10vh); }
+        100% { transform: translateY(110vh); }
       }
       
       .screen-glow {
@@ -110,8 +129,6 @@
 </head>
   <body>
     <div id="root"></div>
-    <div class="scanlines"></div>
-    <div class="screen-glow"></div>
   <script type="module" src="/index.tsx"></script>
 </body>
 </html>
