@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { DiaryEntry, AppView } from './types';
 import { analyzeEntry } from './services/geminiService';
@@ -270,11 +271,11 @@ export default function App() {
       if (view === AppView.RECORDER || isLibraryEmpty) {
          // High Volume for Recorder or Empty Home
          sfx.startLobbyMusic();
-         sfx.setLobbyVolume(0.6); // Louder (was 0.3)
+         sfx.setLobbyVolume(0.25); 
       } else {
          // Low Volume for Library with tapes
          sfx.startLobbyMusic();
-         sfx.setLobbyVolume(0.2); // Quiet but audible (was 0.05)
+         sfx.setLobbyVolume(0.1); 
       }
     }
   }, [view, entries.length]);

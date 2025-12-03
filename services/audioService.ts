@@ -1,5 +1,4 @@
 
-
 export class AudioService {
   private ctx: AudioContext | null = null;
   private masterGain: GainNode | null = null;
@@ -13,14 +12,10 @@ export class AudioService {
   // Lobby/Ambient Music State
   private lobbyNodes: AudioNode[] = [];
   private lobbyGain: GainNode | null = null;
-  
-  // New File-based Lobby Music - Fixed URL structure
-  private lobbyUrl = 'https://raw.githubusercontent.com/furuhana/zen2/main/sy3.wav';
-  private lobbyBuffer: AudioBuffer | null = null;
-  private lobbySource: AudioBufferSourceNode | null = null;
-  private isLobbyLoading: boolean = false;
+  private lobbyTimeouts: number[] = [];
   private desiredLobbyVolume: number = 0.5;
-  private shouldPlayLobby: boolean = false;
+  private isLobbyPlaying: boolean = false; // Track if lobby music is currently active
+  private stopLobbyTimer: number | null = null; // Track the cleanup timer
 
   // Note Frequencies
   private NOTES: Record<string, number> = {
@@ -171,17 +166,22 @@ export class AudioService {
     const gain = this.ctx.createGain();
     const dest = destination || this.masterGain;
 
-    osc.type = 'sine'; // Deep kick
-    osc.frequency.setValueAtTime(150, startTime);
-    osc.frequency.exponentialRampToValueAtTime(40, startTime + 0.1);
+    osc.type = 'square'; // 8-bit kick
+    osc.frequency.setValueAtTime(120, startTime);
+    osc.frequency.exponentialRampToValueAtTime(50, startTime + 0.08);
 
-    gain.gain.setValueAtTime(0.2, startTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.15);
+    gain.gain.setValueAtTime(0.15, startTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.1);
 
-    osc.connect(gain);
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = 150;
+
+    osc.connect(filter);
+    filter.connect(gain);
     gain.connect(dest);
     osc.start(startTime);
-    osc.stop(startTime + 0.15);
+    osc.stop(startTime + 0.1);
     this.activeNodes.push(osc, gain);
   }
 
@@ -189,34 +189,26 @@ export class AudioService {
     if (!this.ctx || !this.masterGain) return;
     const dest = destination || this.masterGain;
     
-    // Noise part
+    // Noise part (Bitcrushed feel)
     const buffer = this.createNoiseBuffer();
     if (buffer) {
         const source = this.ctx.createBufferSource();
         source.buffer = buffer;
         const gain = this.ctx.createGain();
-        gain.gain.setValueAtTime(0.1, startTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.1);
-        source.connect(gain);
+        gain.gain.setValueAtTime(0.05, startTime); // Quiet
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.08);
+        
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.value = 3000;
+        
+        source.connect(filter);
+        filter.connect(gain);
         gain.connect(dest);
         source.start(startTime);
         source.stop(startTime + 0.1);
         this.activeNodes.push(source, gain);
     }
-    
-    // Tone part
-    const osc = this.ctx.createOscillator();
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(200, startTime);
-    osc.frequency.exponentialRampToValueAtTime(100, startTime + 0.05);
-    const oscGain = this.ctx.createGain();
-    oscGain.gain.setValueAtTime(0.05, startTime);
-    oscGain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.05);
-    osc.connect(oscGain);
-    oscGain.connect(dest);
-    osc.start(startTime);
-    osc.stop(startTime + 0.05);
-    this.activeNodes.push(osc, oscGain);
   }
 
   private playHiHat(startTime: number, destination?: AudioNode) {
@@ -228,10 +220,10 @@ export class AudioService {
         source.buffer = buffer;
         const filter = this.ctx.createBiquadFilter();
         filter.type = 'highpass';
-        filter.frequency.value = 8000;
+        filter.frequency.value = 6000;
         const gain = this.ctx.createGain();
-        gain.gain.setValueAtTime(0.04, startTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.05);
+        gain.gain.setValueAtTime(0.02, startTime); // Very Quiet
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.03); // Short
         source.connect(filter);
         filter.connect(gain);
         gain.connect(dest);
@@ -240,6 +232,73 @@ export class AudioService {
         this.activeNodes.push(source, gain);
     }
   }
+
+  // --- Stardew / Pastoral Instruments (8-bit modified) ---
+
+  private playPluck(noteName: string, startTime: number, duration: number, destination?: AudioNode) {
+    if (!this.ctx || !this.masterGain || noteName === 'R') return;
+    const freq = this.NOTES[noteName];
+    if (!freq) return;
+
+    // Chords: Filtered Square for NES feeling
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    const filter = this.ctx.createBiquadFilter();
+    const dest = destination || this.masterGain;
+
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(freq, startTime);
+    
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(800, startTime); // Darker 8-bit tone
+
+    // Pluck Envelope
+    gain.gain.setValueAtTime(0, startTime);
+    gain.gain.linearRampToValueAtTime(0.08, startTime + 0.02); // Quiet
+    gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration); 
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(dest);
+    osc.start(startTime);
+    osc.stop(startTime + duration + 0.1);
+    this.lobbyNodes.push(osc, gain);
+  }
+
+  private playLead(noteName: string, startTime: number, duration: number, destination?: AudioNode) {
+    if (!this.ctx || !this.masterGain || noteName === 'R') return;
+    const freq = this.NOTES[noteName];
+    if (!freq) return;
+
+    // Lead: Square wave with Low Pass for Lo-Fi warmth
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    const filter = this.ctx.createBiquadFilter();
+    const dest = destination || this.masterGain;
+
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(freq, startTime);
+    
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(1200, startTime); // Muffled lead
+
+    // Vibrato
+    osc.detune.setValueAtTime(0, startTime);
+    osc.detune.linearRampToValueAtTime(8, startTime + duration); // More detune for old tape feel
+
+    // Envelope
+    gain.gain.setValueAtTime(0, startTime);
+    gain.gain.linearRampToValueAtTime(0.08, startTime + 0.05); // Quiet lead
+    gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(dest);
+    osc.start(startTime);
+    osc.stop(startTime + duration);
+    this.lobbyNodes.push(osc, gain);
+  }
+
 
   // --- Public SFX Methods ---
   public playBoot() { this.playTone(110, 'square', 0.1, 0); }
@@ -269,86 +328,158 @@ export class AudioService {
     noise.connect(gain); gain.connect(this.masterGain); noise.start(); noise.stop(this.ctx.currentTime + duration);
   }
 
-  // --- Lobby Music (Audio File) ---
+  // --- Lobby Music ---
+
   public async startLobbyMusic() {
-    this.shouldPlayLobby = true;
     this.init();
-    
-    // FORCE RESUME: Browsers block audio until interaction.
     if (this.ctx && this.ctx.state === 'suspended') {
-      try {
-        await this.ctx.resume();
-      } catch(e) {
-        console.warn("Could not resume context auto-play");
-      }
+      try { await this.ctx.resume(); } catch(e) {}
     }
 
     if (!this.ctx || !this.masterGain) return;
-    
-    // If already playing, just ensure volume is correct
-    if (this.lobbySource) {
+
+    // Fix Race Condition: Cancel any pending stop cleanup if we are restarting
+    if (this.stopLobbyTimer !== null) {
+      clearTimeout(this.stopLobbyTimer);
+      this.stopLobbyTimer = null;
+    }
+
+    // Idempotency check to prevent restart glitches
+    if (this.isLobbyPlaying) {
+        this.setLobbyVolume(this.desiredLobbyVolume);
         return;
     }
-
-    if (!this.lobbyBuffer && !this.isLobbyLoading) {
-        this.isLobbyLoading = true;
-        try {
-            console.log("Loading lobby music from:", this.lobbyUrl);
-            const response = await fetch(this.lobbyUrl);
-            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-            const arrayBuffer = await response.arrayBuffer();
-            this.lobbyBuffer = await this.ctx.decodeAudioData(arrayBuffer);
-            this.isLobbyLoading = false;
-            // Only start if we still want to play
-            if (this.shouldPlayLobby) {
-                this.playLobbyBuffer();
-            }
-        } catch (error) {
-            console.error("Failed to load lobby music:", error);
-            this.isLobbyLoading = false;
-        }
-    } else if (this.lobbyBuffer) {
-        this.playLobbyBuffer();
-    }
-  }
-
-  private playLobbyBuffer() {
-    if (!this.ctx || !this.masterGain || !this.lobbyBuffer) return;
-    if (this.lobbySource) return; // Already playing
+    
+    this.isLobbyPlaying = true;
 
     this.lobbyGain = this.ctx.createGain();
-    this.lobbyGain.gain.setValueAtTime(0, this.ctx.currentTime); // Fade in start
-    this.lobbyGain.gain.linearRampToValueAtTime(this.desiredLobbyVolume, this.ctx.currentTime + 1);
+    this.lobbyGain.gain.setValueAtTime(0, this.ctx.currentTime);
+    this.lobbyGain.gain.linearRampToValueAtTime(this.desiredLobbyVolume, this.ctx.currentTime + 2);
     this.lobbyGain.connect(this.masterGain);
+    this.lobbyNodes.push(this.lobbyGain);
 
-    this.lobbySource = this.ctx.createBufferSource();
-    this.lobbySource.buffer = this.lobbyBuffer;
-    this.lobbySource.loop = true;
-    this.lobbySource.connect(this.lobbyGain);
-    this.lobbySource.start();
-    this.lobbyNodes.push(this.lobbySource, this.lobbyGain);
+    const beatDuration = 0.5; 
+
+    // Background Tape Hiss for Lo-Fi texture
+    const buffer = this.createNoiseBuffer();
+    if (buffer) {
+      const hiss = this.ctx.createBufferSource();
+      hiss.buffer = buffer;
+      hiss.loop = true;
+      const hissGain = this.ctx.createGain();
+      hissGain.gain.value = 0.05; // Audible noise floor
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.value = 1000;
+      hiss.connect(filter);
+      filter.connect(hissGain);
+      hissGain.connect(this.lobbyGain);
+      hiss.start();
+      this.lobbyNodes.push(hiss, hissGain);
+    }
+
+    // User-Defined Composition
+    const pattern = {
+        // C Major -> F Major -> G Major -> A Minor
+        pluck: [
+            // C: C4 E4 G4
+            ['C4', 8], ['E4', 8], ['G4', 8], ['E4', 8], ['C4', 8], ['E4', 8], ['G4', 8], ['E4', 8],
+            // F: F4 A4 C5
+            ['F4', 8], ['A4', 8], ['C5', 8], ['A4', 8], ['F4', 8], ['A4', 8], ['C5', 8], ['A4', 8],
+            // G: G4 B4 D5
+            ['G4', 8], ['B4', 8], ['D5', 8], ['B4', 8], ['G4', 8], ['B4', 8], ['D5', 8], ['B4', 8],
+            // Am: A4 C5 E5
+            ['A4', 8], ['C5', 8], ['E5', 8], ['C5', 8], ['A4', 8], ['C5', 8], ['E5', 8], ['C5', 8]
+        ],
+        // Lead Melody from prompt
+        lead: [
+            // Section 1
+            ['C4', 8], ['E4', 8], ['G4', 8], ['C5', 8], ['E5', 2], ['R', 4], // C4 E4 G4 C5 E5
+            ['D4', 8], ['E4', 8], ['F4', 8], ['G4', 8], ['A4', 2], ['R', 4], // D4 E4 F4 G4 A4
+            ['C4', 8], ['G4', 8], ['E4', 8], ['C5', 8], ['R', 2],           // C4 G4 E4 C5
+            ['F4', 8], ['A4', 8], ['G4', 8], ['F4', 8], ['E4', 2], ['R', 4], // F4 A4 G4 F4 E4
+
+            // Section 2
+            ['G4', 8], ['E4', 8], ['C4', 8], ['G4', 8], ['R', 2],           // G4 E4 C4 G4
+            ['F4', 8], ['E4', 8], ['D4', 8], ['C4', 8], ['R', 2],           // F4 E4 D4 C4
+            ['E4', 8], ['G4', 8], ['C5', 8], ['E4', 8], ['R', 2],           // E4 G4 C5 E4
+            ['D4', 8], ['F4', 8], ['A4', 8], ['G4', 8], ['R', 2],           // D4 F4 A4 G4
+
+            // Section 3
+            ['C5', 8], ['E5', 8], ['G5', 8], ['C5', 8], ['R', 2],           // C5 E5 G5 C5
+            ['C4', 8], ['E4', 8], ['G4', 8], ['C5', 8], ['R', 2],           // C4 E4 G4 C5
+            ['F4', 8], ['G4', 8], ['A4', 8], ['G4', 8], ['R', 2],           // F4 G4 A4 G4
+            ['D4', 8], ['E4', 8], ['C4', 8], ['F4', 8], ['R', 2],           // D4 E4 C4 F4
+            ['R', 1] // Rest for a bar
+        ],
+        // Drum Pattern: Kick on Quarter, Snare on Backbeat (simulated), HH on 8th
+        kick: [
+            ['C1', 4], ['C1', 4], ['C1', 4], ['C1', 4]
+        ],
+        snare: [
+            ['R', 4], ['D1', 4], ['R', 4], ['D1', 4]
+        ],
+        hihat: [
+            ['F1', 8], ['F1', 8], ['F1', 8], ['F1', 8], ['F1', 8], ['F1', 8], ['F1', 8], ['F1', 8]
+        ]
+    };
+
+    // Helper for playing tracks
+    const playLobbyTrack = (trackName: string, notes: [string, number][], loopIndex: number = 0) => {
+        if (!this.ctx || !this.isLobbyPlaying) return; // Stop if flag cleared
+        if (loopIndex >= notes.length) loopIndex = 0;
+
+        const [note, type] = notes[loopIndex];
+        const duration = (4 / type) * beatDuration;
+        const now = this.ctx.currentTime;
+
+        if (trackName === 'pluck') this.playPluck(note, now, duration * 2, this.lobbyGain!);
+        else if (trackName === 'lead') this.playLead(note, now, duration, this.lobbyGain!);
+        else if (trackName === 'kick' && note !== 'R') this.playKick(now, this.lobbyGain!);
+        else if (trackName === 'snare' && note !== 'R') this.playSnare(now, this.lobbyGain!);
+        else if (trackName === 'hihat' && note !== 'R') this.playHiHat(now, this.lobbyGain!);
+
+        const id = window.setTimeout(() => {
+            playLobbyTrack(trackName, notes, loopIndex + 1);
+        }, duration * 1000);
+        this.lobbyTimeouts.push(id);
+    };
+
+    playLobbyTrack('pluck', pattern.pluck as [string, number][]);
+    playLobbyTrack('lead', pattern.lead as [string, number][]);
+    playLobbyTrack('kick', pattern.kick as [string, number][]);
+    playLobbyTrack('snare', pattern.snare as [string, number][]);
+    playLobbyTrack('hihat', pattern.hihat as [string, number][]);
   }
 
   public setLobbyVolume(vol: number) {
     this.desiredLobbyVolume = vol;
     if (this.lobbyGain && this.ctx) {
-        // Smooth ramp to avoid clicks
         this.lobbyGain.gain.setTargetAtTime(vol, this.ctx.currentTime, 0.5);
     }
   }
 
   public stopLobbyMusic() {
-    this.shouldPlayLobby = false;
+    this.isLobbyPlaying = false;
     
-    if (this.lobbyGain && this.ctx) {
-         // Fade out then stop
-         this.lobbyGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.3);
-         setTimeout(() => {
-             this.cleanupLobbyNodes();
-         }, 350);
-    } else {
-        this.cleanupLobbyNodes();
+    // Clear any existing cleanup timer so we don't have multiple
+    if (this.stopLobbyTimer !== null) {
+      clearTimeout(this.stopLobbyTimer);
+      this.stopLobbyTimer = null;
     }
+
+    // Fade out
+    if (this.lobbyGain && this.ctx) {
+         this.lobbyGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.5);
+    }
+
+    // Delayed cleanup
+    this.stopLobbyTimer = window.setTimeout(() => {
+        this.cleanupLobbyNodes();
+        this.lobbyTimeouts.forEach(id => clearTimeout(id));
+        this.lobbyTimeouts = [];
+        this.stopLobbyTimer = null;
+    }, 550);
   }
 
   private cleanupLobbyNodes() {
@@ -363,7 +494,6 @@ export class AudioService {
         try { this.lobbyGain.disconnect(); } catch(e) {}
         this.lobbyGain = null;
     }
-    this.lobbySource = null;
   }
 
   // --- Music Sequencer (Tape Player) ---
