@@ -13,7 +13,14 @@ export class AudioService {
   // Lobby/Ambient Music State
   private lobbyNodes: AudioNode[] = [];
   private lobbyGain: GainNode | null = null;
-  private lobbyTimeouts: number[] = []; // Track sequencer timeouts for lobby
+  
+  // New File-based Lobby Music
+  private lobbyUrl = 'https://raw.githubusercontent.com/furuhana/zen2/refs/heads/main/sy3.wav';
+  private lobbyBuffer: AudioBuffer | null = null;
+  private lobbySource: AudioBufferSourceNode | null = null;
+  private isLobbyLoading: boolean = false;
+  private desiredLobbyVolume: number = 0.5;
+  private shouldPlayLobby: boolean = false;
 
   // Note Frequencies
   private NOTES: Record<string, number> = {
@@ -44,6 +51,12 @@ export class AudioService {
       this.masterGain.connect(this.ctx.destination);
     }
     if (this.ctx.state === 'suspended') {
+      this.ctx.resume();
+    }
+  }
+
+  public resumeContext() {
+    if (this.ctx && this.ctx.state === 'suspended') {
       this.ctx.resume();
     }
   }
@@ -256,99 +269,68 @@ export class AudioService {
     noise.connect(gain); gain.connect(this.masterGain); noise.start(); noise.stop(this.ctx.currentTime + duration);
   }
 
-  // --- Lobby Music (Sequencer) ---
-  public startLobbyMusic() {
+  // --- Lobby Music (Audio File) ---
+  public async startLobbyMusic() {
+    this.shouldPlayLobby = true;
     this.init();
-    if (!this.ctx || !this.masterGain) return;
     
-    // Only start if not already playing
-    if (this.lobbyTimeouts.length > 0) return;
-
-    this.lobbyGain = this.ctx.createGain();
-    this.lobbyGain.gain.setValueAtTime(0.1, this.ctx.currentTime); // Start Vol
-    this.lobbyGain.connect(this.masterGain);
-
-    // Background Hiss (Softer for lobby)
-    const buffer = this.createNoiseBuffer();
-    if (buffer) {
-        const hiss = this.ctx.createBufferSource();
-        hiss.buffer = buffer;
-        hiss.loop = true;
-        const hissGain = this.ctx.createGain();
-        hissGain.gain.value = 0.015; // Very subtle
-        const filter = this.ctx.createBiquadFilter();
-        filter.type = 'lowpass';
-        filter.frequency.value = 600;
-        hiss.connect(filter);
-        filter.connect(hissGain);
-        hissGain.connect(this.lobbyGain);
-        hiss.start();
-        this.lobbyNodes.push(hiss, hissGain, filter);
+    // FORCE RESUME: Browsers block audio until interaction.
+    // This method is called from App.tsx mostly, which can happen on load.
+    // If context is suspended, sound won't play until we resume.
+    if (this.ctx && this.ctx.state === 'suspended') {
+      try {
+        await this.ctx.resume();
+      } catch(e) {
+        console.warn("Could not resume context auto-play");
+      }
     }
 
-    // Lobby Pattern: Relaxed 70 BPM (approx 0.85s per beat, 1/8 note = 0.425s)
-    // Structure: Simple repeated loop
-    const eighth = 0.425;
-    const quarter = 0.85;
+    if (!this.ctx || !this.masterGain) return;
+    
+    // If already playing, just ensure volume is correct
+    if (this.lobbySource) {
+        return;
+    }
 
-    const lobbyPattern = {
-        melody: [
-            ['E4', 2], ['R', 1], ['D4', 1], ['C4', 2], ['R', 2],
-            ['G3', 2], ['A3', 2], ['C4', 4]
-        ],
-        bass: [
-            ['C2', 4], ['G2', 4],
-            ['A2', 4], ['F2', 4]
-        ],
-        kick: [
-            ['C1', 4], ['R', 4], 
-            ['C1', 4], ['R', 4]
-        ],
-        snare: [
-            ['R', 4], ['D1', 4], 
-            ['R', 4], ['D1', 4]
-        ],
-        hihat: [
-            ['F1', 1], ['F1', 1], ['F1', 1], ['F1', 1], 
-            ['F1', 1], ['F1', 1], ['F1', 1], ['F1', 1],
-            ['F1', 1], ['F1', 1], ['F1', 1], ['F1', 1], 
-            ['F1', 1], ['F1', 1], ['F1', 1], ['F1', 1]
-        ]
-    };
+    if (!this.lobbyBuffer && !this.isLobbyLoading) {
+        this.isLobbyLoading = true;
+        try {
+            const response = await fetch(this.lobbyUrl);
+            const arrayBuffer = await response.arrayBuffer();
+            this.lobbyBuffer = await this.ctx.decodeAudioData(arrayBuffer);
+            this.isLobbyLoading = false;
+            // Only start if we still want to play
+            if (this.shouldPlayLobby) {
+                this.playLobbyBuffer();
+            }
+        } catch (error) {
+            console.error("Failed to load lobby music", error);
+            this.isLobbyLoading = false;
+        }
+    } else if (this.lobbyBuffer) {
+        this.playLobbyBuffer();
+    }
+  }
 
-    // Helper to get duration in seconds
-    const getLobbyDuration = (units: number) => units * eighth;
+  private playLobbyBuffer() {
+    if (!this.ctx || !this.masterGain || !this.lobbyBuffer) return;
+    if (this.lobbySource) return; // Already playing
 
-    const playLobbyTrack = (trackName: string, notes: [string, number][], loopIndex: number = 0) => {
-        if (!this.ctx || !this.lobbyGain) return;
-        if (loopIndex >= notes.length) loopIndex = 0;
+    this.lobbyGain = this.ctx.createGain();
+    this.lobbyGain.gain.setValueAtTime(0, this.ctx.currentTime); // Fade in start
+    this.lobbyGain.gain.linearRampToValueAtTime(this.desiredLobbyVolume, this.ctx.currentTime + 1);
+    this.lobbyGain.connect(this.masterGain);
 
-        const [note, durationUnits] = notes[loopIndex];
-        const durationSeconds = getLobbyDuration(durationUnits);
-        const now = this.ctx.currentTime;
-
-        // Route all lobby sounds to lobbyGain
-        if (trackName === 'melody') this.playMelodyNote(note, now, durationSeconds, this.lobbyGain);
-        else if (trackName === 'bass') this.playBassNote(note, now, durationSeconds, this.lobbyGain);
-        else if (trackName === 'kick' && note !== 'R') this.playKick(now, this.lobbyGain);
-        else if (trackName === 'snare' && note !== 'R') this.playSnare(now, this.lobbyGain);
-        else if (trackName === 'hihat' && note !== 'R') this.playHiHat(now, this.lobbyGain);
-
-        const id = window.setTimeout(() => {
-            playLobbyTrack(trackName, notes, loopIndex + 1);
-        }, durationSeconds * 1000);
-        
-        this.lobbyTimeouts.push(id);
-    };
-
-    playLobbyTrack('melody', lobbyPattern.melody as [string, number][]);
-    playLobbyTrack('bass', lobbyPattern.bass as [string, number][]);
-    playLobbyTrack('kick', lobbyPattern.kick as [string, number][]);
-    playLobbyTrack('snare', lobbyPattern.snare as [string, number][]);
-    playLobbyTrack('hihat', lobbyPattern.hihat as [string, number][]);
+    this.lobbySource = this.ctx.createBufferSource();
+    this.lobbySource.buffer = this.lobbyBuffer;
+    this.lobbySource.loop = true;
+    this.lobbySource.connect(this.lobbyGain);
+    this.lobbySource.start();
+    this.lobbyNodes.push(this.lobbySource, this.lobbyGain);
   }
 
   public setLobbyVolume(vol: number) {
+    this.desiredLobbyVolume = vol;
     if (this.lobbyGain && this.ctx) {
         // Smooth ramp to avoid clicks
         this.lobbyGain.gain.setTargetAtTime(vol, this.ctx.currentTime, 0.5);
@@ -356,30 +338,32 @@ export class AudioService {
   }
 
   public stopLobbyMusic() {
-    // Clear Sequencer
-    this.lobbyTimeouts.forEach(id => clearTimeout(id));
-    this.lobbyTimeouts = [];
-
+    this.shouldPlayLobby = false;
+    
     if (this.lobbyGain && this.ctx) {
          // Fade out then stop
-         this.lobbyGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.2);
+         this.lobbyGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.3);
          setTimeout(() => {
-             this.lobbyNodes.forEach(node => {
-                 try {
-                    if (node instanceof OscillatorNode || node instanceof AudioBufferSourceNode) node.stop();
-                    node.disconnect();
-                 } catch(e) {}
-             });
-             this.lobbyNodes = [];
-             if (this.lobbyGain) this.lobbyGain.disconnect();
-             this.lobbyGain = null;
-         }, 300);
+             this.cleanupLobbyNodes();
+         }, 350);
     } else {
-        this.lobbyNodes.forEach(node => {
-            try { node.disconnect(); } catch(e) {}
-        });
-        this.lobbyNodes = [];
+        this.cleanupLobbyNodes();
     }
+  }
+
+  private cleanupLobbyNodes() {
+    this.lobbyNodes.forEach(node => {
+        try {
+           if (node instanceof OscillatorNode || node instanceof AudioBufferSourceNode) node.stop();
+           node.disconnect();
+        } catch(e) {}
+    });
+    this.lobbyNodes = [];
+    if (this.lobbyGain) {
+        try { this.lobbyGain.disconnect(); } catch(e) {}
+        this.lobbyGain = null;
+    }
+    this.lobbySource = null;
   }
 
   // --- Music Sequencer (Tape Player) ---

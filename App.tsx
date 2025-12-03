@@ -126,7 +126,7 @@ export default function App() {
     let hasChanges = false;
     let maxZ = 0;
     
-    Object.values(newPositions).forEach(pos => {
+    Object.values(newPositions).forEach((pos: Position) => {
       if (pos.z > maxZ) maxZ = pos.z;
     });
 
@@ -181,7 +181,7 @@ export default function App() {
     
     // Find highest Z to bring to front
     let maxZ = 0;
-    Object.values(tapePositions).forEach(pos => {
+    Object.values(tapePositions).forEach((pos: Position) => {
       if (pos.z && pos.z > maxZ) maxZ = pos.z;
     });
 
@@ -270,11 +270,11 @@ export default function App() {
       if (view === AppView.RECORDER || isLibraryEmpty) {
          // High Volume for Recorder or Empty Home
          sfx.startLobbyMusic();
-         sfx.setLobbyVolume(0.3); // Louder
+         sfx.setLobbyVolume(0.6); // Louder (was 0.3)
       } else {
          // Low Volume for Library with tapes
          sfx.startLobbyMusic();
-         sfx.setLobbyVolume(0.05); // Very quiet
+         sfx.setLobbyVolume(0.2); // Quiet but audible (was 0.05)
       }
     }
   }, [view, entries.length]);
@@ -451,9 +451,17 @@ export default function App() {
     }
   };
 
+  // Add global interaction handler to resume audio context
+  const handleInteraction = () => {
+    sfx.resumeContext();
+  };
+
   if (showIntro) {
     return (
-      <div className="h-screen w-full flex items-center justify-center bg-black text-amber-500 font-mono flex-col gap-4 z-50 fixed top-0 left-0">
+      <div 
+        className="h-screen w-full flex items-center justify-center bg-black text-amber-500 font-mono flex-col gap-4 z-50 fixed top-0 left-0"
+        onMouseDown={handleInteraction} // Try to resume here too
+      >
         <Cpu size={64} className="animate-pulse" />
         <div className="text-2xl tracking-[0.5em] animate-pulse">BOOTING_SYSTEM</div>
         
@@ -477,6 +485,7 @@ export default function App() {
       className="min-h-screen w-full bg-[#111] text-amber-500 font-mono selection:bg-amber-900 selection:text-white flex flex-col overflow-hidden relative"
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
+      onMouseDown={handleInteraction} // Capture interaction to resume AudioContext
     >
       <style>{`
         @keyframes slideOutLeft { to { transform: translateX(-150%) rotateY(20deg); opacity: 0; } }
