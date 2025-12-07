@@ -1,8 +1,7 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { DiaryEntry, AppView } from './types';
 import { analyzeEntry } from './services/geminiService';
-import { sfx } from './services/audioService';
+import { sfx } from './services/audioService'; 
 import { Tape } from './components/Tape';
 import { Recorder } from './components/Recorder';
 import { PixelAvatar } from './components/PixelAvatar';
@@ -12,14 +11,26 @@ import { Plus, Trash2, Rewind, Play, Pause, FastForward, ChevronLeft, Cpu, Volum
 const STORAGE_KEY = 'retrolog_entries_v1';
 const POSITIONS_KEY = 'retrolog_positions_v1';
 
-// Helper for random number - Improved for better distribution
+// --- 🎵 第一步：定义音乐映射表 ---
+// 这里的路径 "/1.mp3" 会自动去寻找 public 文件夹下的文件
+const MOOD_PLAYLIST: Record<string, string> = {
+  "😄": "/1.mp3",
+  "🌧️": "/2.mp3",
+  "💓": "/3.mp3",
+  "💢": "/4.mp3",
+  "🍃": "/5.mp3",
+  "🔮": "/6.mp3",
+  "BGM": "/7.mp3", // 默认背景音乐
+};
+
+// Helper for random number
 const seededRandom = (seed: string) => {
   let h = 0x811c9dc5;
   for (let i = 0; i < seed.length; i++) {
     h ^= seed.charCodeAt(i);
     h = Math.imul(h, 0x01000193);
   }
-  return (h >>> 0) / 4294967296; // Full 0-1 float range
+  return (h >>> 0) / 4294967296; 
 };
 
 interface Position {
@@ -36,7 +47,7 @@ const StatusDisplay = ({ count }: { count: number }) => {
 
   useEffect(() => {
     let index = 0;
-    setDisplayText(''); // Reset
+    setDisplayText(''); 
     const timer = setInterval(() => {
       if (index < fullText.length) {
         setDisplayText(fullText.slice(0, index + 1));
@@ -44,7 +55,7 @@ const StatusDisplay = ({ count }: { count: number }) => {
       } else {
         clearInterval(timer);
       }
-    }, 40); // Typing speed
+    }, 40); 
     return () => clearInterval(timer);
   }, [fullText]);
 
@@ -67,8 +78,8 @@ export default function App() {
   // Layout & Dragging State
   const [tapePositions, setTapePositions] = useState<Record<string, Position>>({});
   const [dragState, setDragState] = useState<{ id: string, startX: number, startY: number, initialX: number, initialY: number } | null>(null);
-  const [droppingId, setDroppingId] = useState<string | null>(null); // For closing animation
-  const isDraggingRef = useRef(false); // Track if a move actually happened
+  const [droppingId, setDroppingId] = useState<string | null>(null);
+  const isDraggingRef = useRef(false);
   const libraryRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
@@ -78,6 +89,9 @@ export default function App() {
   const [isFlipped, setIsFlipped] = useState(false);
   const [slideDirection, setSlideDirection] = useState<'left' | 'right' | 'in'>('in');
   
+  // --- 🎵 第二步：添加音频播放器引用 ---
+  const musicPlayerRef = useRef<HTMLAudioElement | null>(null);
+
   const typewriterTimeoutRef = useRef<number | null>(null);
   const lastTypedIdRef = useRef<string | null>(null);
 
@@ -105,9 +119,9 @@ export default function App() {
           setShowIntro(false);
           return 100;
         }
-        return prev + 5; // Fast load
+        return prev + 5; 
       });
-    }, 40); // Total approx 800ms
+    }, 40); 
 
     return () => clearInterval(interval);
   }, []);
@@ -121,7 +135,7 @@ export default function App() {
     localStorage.setItem(POSITIONS_KEY, JSON.stringify(tapePositions));
   }, [tapePositions]);
 
-  // Initialize positions for new entries
+  // Initialize positions
   useEffect(() => {
     const newPositions = { ...tapePositions };
     let hasChanges = false;
@@ -131,9 +145,6 @@ export default function App() {
       if (pos.z > maxZ) maxZ = pos.z;
     });
 
-    // Calculate bounds to keep tapes within screen
-    // Tape approx 330px width, 200px height. 
-    // We want center point bounds.
     const marginX = 180; 
     const marginY = 120;
     const availableW = window.innerWidth - (marginX * 2);
@@ -146,10 +157,8 @@ export default function App() {
         const rngRot = seededRandom(entry.id + 'r');
         
         newPositions[entry.id] = {
-          // Clamp within visible area
           x: (rngX * availableW) - (availableW / 2),
           y: (rngY * availableH) - (availableH / 2),
-          // Range: -40 to +40 degrees (Varied but under 45 limit)
           r: (rngRot * 80) - 40,
           z: ++maxZ
         };
@@ -162,10 +171,8 @@ export default function App() {
     }
   }, [entries]);
 
-  // Animation effect for dropping tape
   useEffect(() => {
     if (droppingId) {
-      // Small delay to allow CSS transition to trigger from the large scale state
       const timer = setTimeout(() => {
         setDroppingId(null);
       }, 50);
@@ -178,9 +185,8 @@ export default function App() {
     e.stopPropagation();
     if (view !== AppView.LIBRARY) return;
     
-    isDraggingRef.current = false; // Reset drag flag
+    isDraggingRef.current = false;
     
-    // Find highest Z to bring to front
     let maxZ = 0;
     Object.values(tapePositions).forEach((pos: Position) => {
       if (pos.z && pos.z > maxZ) maxZ = pos.z;
@@ -210,7 +216,6 @@ export default function App() {
     const dx = e.clientX - dragState.startX;
     const dy = e.clientY - dragState.startY;
 
-    // Check if moved significantly to consider it a drag
     if (Math.hypot(dx, dy) > 5) {
         isDraggingRef.current = true;
     }
@@ -230,7 +235,7 @@ export default function App() {
   };
 
   const onTapeClick = (entry: DiaryEntry) => {
-      if (isDraggingRef.current) return; // Ignore click if dragging occurred
+      if (isDraggingRef.current) return;
 
       sfx.playClick();
       sfx.playInsertTape();
@@ -241,44 +246,62 @@ export default function App() {
       setView(AppView.PLAYER);
   };
 
-  // --- Audio Loop ---
+  // --- 🎵 第三步：核心播放逻辑 ---
   useEffect(() => {
-    let musicTimer: number | null = null;
+    // 1. 初始化播放器
+    if (!musicPlayerRef.current) {
+      musicPlayerRef.current = new Audio();
+      musicPlayerRef.current.loop = true;
+    }
+    
+    const audio = musicPlayerRef.current;
+    let targetSrc = "";
+    let targetVolume = 0.5;
+
+    // 2. 根据场景判断播放哪首歌曲
     if (view === AppView.PLAYER && currentEntry) {
+      // 如果在播放磁带，根据 Emoji 找歌
+      const moodTrack = MOOD_PLAYLIST[currentEntry.emoji];
+      targetSrc = moodTrack || MOOD_PLAYLIST["BGM"]; // 找不到就播默认BGM
+      targetVolume = 0.6; // 磁带音量大一点
+    } else {
+      // 否则（在首页或录音），播放背景音乐
+      targetSrc = MOOD_PLAYLIST["BGM"];
+      targetVolume = 0.2; // 首页背景音量小一点
+    }
+
+    // 3. 执行切歌和音量调整
+    const handleAudioChange = async () => {
+      // 检查当前是不是已经在播这首歌了
+      const currentSrcPath = audio.src.replace(window.location.origin, '');
+
+      if (currentSrcPath !== targetSrc) {
+        audio.src = targetSrc;
+        if (isPlayingMusic) {
+          try {
+            await audio.play();
+          } catch (e) {
+            console.log("等待用户交互后播放音频");
+          }
+        }
+      }
+
+      audio.volume = targetVolume;
+
       if (isPlayingMusic) {
-         musicTimer = window.setTimeout(() => {
-            sfx.startLofiLoop(currentEntry.color);
-         }, 500);
+        if (audio.paused && audio.src) audio.play().catch(() => {});
       } else {
-        sfx.stopLofiLoop();
+        audio.pause();
       }
-    } else {
-      sfx.stopLofiLoop();
-    }
-    return () => {
-      if (musicTimer) clearTimeout(musicTimer);
-      sfx.stopLofiLoop();
     };
-  }, [view, currentEntryId, isPlayingMusic]);
 
-  // --- Lobby Music Logic ---
-  useEffect(() => {
-    const isLibraryEmpty = entries.length === 0;
+    handleAudioChange();
 
-    if (view === AppView.PLAYER) {
-      sfx.stopLobbyMusic();
-    } else {
-      if (view === AppView.RECORDER || isLibraryEmpty) {
-         // High Volume for Recorder or Empty Home
-         sfx.startLobbyMusic();
-         sfx.setLobbyVolume(0.25); 
-      } else {
-         // Low Volume for Library with tapes
-         sfx.startLobbyMusic();
-         sfx.setLobbyVolume(0.1); 
-      }
-    }
-  }, [view, entries.length]);
+    return () => {
+      // 组件卸载清理逻辑
+    };
+  }, [view, currentEntryId, currentEntry, isPlayingMusic]);
+
 
   // --- Typewriter ---
   useEffect(() => {
@@ -323,12 +346,12 @@ export default function App() {
       color,
       emoji,
       author,
-      moodId // Persist user selected mood ID
+      moodId 
     };
     setEntries(prev => [newEntry, ...prev]);
     sfx.playEjectTape();
     setView(AppView.LIBRARY);
-    setDroppingId(newEntry.id); // Animate new tape dropping in
+    setDroppingId(newEntry.id); 
     try {
       const analysis = await analyzeEntry(content);
       setEntries(prev => prev.map(entry => 
@@ -346,7 +369,6 @@ export default function App() {
   const handleDeleteEntry = (id: string) => {
     sfx.playDelete(); 
     setEntries(prev => prev.filter(e => e.id !== id));
-    // Also remove position
     setTapePositions(prev => {
         const next = { ...prev };
         delete next[id];
@@ -390,9 +412,8 @@ export default function App() {
   }
 
   const handleClosePlayer = () => {
-    sfx.stopLofiLoop(); 
     sfx.playPowerDown();
-    setDroppingId(currentEntryId); // Trigger closing animation for this specific tape
+    setDroppingId(currentEntryId); 
     setView(AppView.LIBRARY);
     setCurrentEntryId(null);
     setIsPlayingMusic(true); 
@@ -436,7 +457,6 @@ export default function App() {
         try {
           const importedEntries = JSON.parse(e.target?.result as string);
           if (Array.isArray(importedEntries)) {
-            // Merge logic: Add entries that don't exist by ID
             setEntries(prev => {
               const existingIds = new Set(prev.map(p => p.id));
               const newUnique = importedEntries.filter((ie: DiaryEntry) => !existingIds.has(ie.id));
@@ -446,27 +466,29 @@ export default function App() {
           }
         } catch (error) {
           console.error("Import failed", error);
-          sfx.playDelete(); // Error sound
+          sfx.playDelete(); 
         }
       };
     }
   };
 
-  // Add global interaction handler to resume audio context
   const handleInteraction = () => {
     sfx.resumeContext();
+    // 交互时尝试启动音乐
+    if (musicPlayerRef.current && isPlayingMusic) {
+      musicPlayerRef.current.play().catch(() => {});
+    }
   };
 
   if (showIntro) {
     return (
       <div 
         className="h-screen w-full flex items-center justify-center bg-black text-amber-500 font-mono flex-col gap-4 z-50 fixed top-0 left-0"
-        onMouseDown={handleInteraction} // Try to resume here too
+        onMouseDown={handleInteraction} 
       >
         <Cpu size={64} className="animate-pulse" />
         <div className="text-2xl tracking-[0.5em] animate-pulse">BOOTING_SYSTEM</div>
         
-        {/* Retro Loading Bar */}
         <div className="w-64 h-4 border-2 border-amber-800 p-0.5 rounded">
           <div 
             className="h-full bg-amber-600 transition-all duration-75 ease-linear"
@@ -486,7 +508,7 @@ export default function App() {
       className="min-h-screen w-full bg-[#111] text-amber-500 font-mono selection:bg-amber-900 selection:text-white flex flex-col overflow-hidden relative"
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
-      onMouseDown={handleInteraction} // Capture interaction to resume AudioContext
+      onMouseDown={handleInteraction} 
     >
       <style>{`
         @keyframes slideOutLeft { to { transform: translateX(-150%) rotateY(20deg); opacity: 0; } }
@@ -503,7 +525,6 @@ export default function App() {
         .animate-drop-in { animation: dropIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
       `}</style>
       
-      {/* Global CRT Effects moved from index.html */}
       <div className="scanlines"></div>
       <div 
         className="scan-bar" 
@@ -511,10 +532,8 @@ export default function App() {
       ></div>
       <div className="screen-glow"></div>
       
-      {/* Background Layer */}
       <ContainerBackground />
       
-      {/* Top Bar - Fixed height (h-20) to prevent jumping */}
       <header className="h-20 border-b border-amber-900/30 bg-[#0a0a0a]/80 backdrop-blur-md p-4 flex justify-between items-center sticky top-0 z-40 shadow-2xl shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 border-2 border-amber-600 rounded-sm flex items-center justify-center bg-amber-900/20">
@@ -537,7 +556,6 @@ export default function App() {
         )}
       </header>
 
-      {/* Main Content */}
       <main className="flex-1 overflow-hidden relative flex flex-col z-10">
         
         {view === AppView.LIBRARY && (
@@ -566,10 +584,6 @@ export default function App() {
                     const isDragging = dragState?.id === entry.id;
                     const isDropping = droppingId === entry.id;
 
-                    // Calculate Scale: 
-                    // 1.15 if dragging
-                    // 1.5 -> 1.2 if dropping (closing animation) - REDUCED FROM 2.5
-                    // 1.2 normally
                     const scale = isDragging ? 1.15 : (isDropping ? 1.5 : 1.2);
 
                     return (
@@ -581,9 +595,6 @@ export default function App() {
                           transform: `translate(calc(-50% + ${pos.x}px), calc(-50% + ${pos.y}px)) rotate(${pos.r}deg) scale(${scale})`,
                           zIndex: isDragging ? 99999 : (isDropping ? 9999 : pos.z),
                           cursor: isDragging ? 'grabbing' : 'grab',
-                          // If dropping, we use a 500ms transition for the "fall". 
-                          // If dragging, no transition for responsiveness.
-                          // Otherwise, standard hover/movement transition.
                           transition: isDragging ? 'none' : (isDropping ? 'transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)' : 'transform 0.1s ease-out'), 
                         }}
                       >
@@ -627,29 +638,27 @@ export default function App() {
               onClick={(e) => e.stopPropagation()} 
               className="max-w-4xl w-full bg-neutral-900 border border-neutral-700 rounded-xl overflow-hidden shadow-2xl relative animate-[fadeIn_0.5s_ease-out] cursor-auto"
             >
-              {/* Reduced tape section height from 300 to 260px */}
               <div className="bg-[#1a1a1a] p-8 border-b-4 border-neutral-800 flex justify-center perspective-[1000px] overflow-visible relative min-h-[260px] items-center">
                   <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] rounded-full blur-[100px] opacity-40 backlight-pulse z-0 ${currentEntry.color?.replace('bg-', 'bg-')}`}></div>
                   <div className={`transform transition-all duration-300 relative z-10 ${slideDirection === 'left' ? 'slide-left' : ''} ${slideDirection === 'right' ? 'slide-right' : ''} ${slideDirection === 'in' ? 'slide-in' : ''}`}>
-                     <div className="cute-wobble">
-                        <Tape 
-                          label={currentEntry.title || 'UNTITLED'} 
-                          date={formatDate(currentEntry.timestamp)}
-                          color={currentEntry.color}
-                          emoji={currentEntry.emoji}
-                          author={currentEntry.author}
-                          isPlaying={isPlayingMusic} 
-                          isAnalyzing={!currentEntry.isAnalayzed}
-                          isFlipped={isFlipped}
-                          onClick={handleTapeFlip}
-                          className={`!shadow-[0_0_50px_rgba(0,0,0,0.5)]`}
-                          style={{ boxShadow: `0 0 60px ${currentEntry.color?.includes('pink') ? 'rgba(236,72,153,0.6)' : currentEntry.color?.includes('blue') ? 'rgba(37,99,235,0.6)' : 'rgba(147,51,234,0.6)'}` }}
-                        />
-                     </div>
+                      <div className="cute-wobble">
+                         <Tape 
+                           label={currentEntry.title || 'UNTITLED'} 
+                           date={formatDate(currentEntry.timestamp)}
+                           color={currentEntry.color}
+                           emoji={currentEntry.emoji}
+                           author={currentEntry.author}
+                           isPlaying={isPlayingMusic} 
+                           isAnalyzing={!currentEntry.isAnalayzed}
+                           isFlipped={isFlipped}
+                           onClick={handleTapeFlip}
+                           className={`!shadow-[0_0_50px_rgba(0,0,0,0.5)]`}
+                           style={{ boxShadow: `0 0 60px ${currentEntry.color?.includes('pink') ? 'rgba(236,72,153,0.6)' : currentEntry.color?.includes('blue') ? 'rgba(37,99,235,0.6)' : 'rgba(147,51,234,0.6)'}` }}
+                         />
+                      </div>
                   </div>
               </div>
 
-              {/* Reduced content area height from 350px to 240px */}
               <div className="p-6 md:p-8 h-[240px] overflow-y-auto bg-black text-amber-500 font-mono text-lg leading-relaxed relative border-b border-neutral-800">
                 <div className="whitespace-pre-wrap relative z-10">
                   {currentEntry.mood && (
@@ -659,7 +668,6 @@ export default function App() {
                   )}
                   {typedContent}<span className="inline-block w-2 h-5 bg-amber-500 animate-pulse ml-1 align-middle"></span>
                 </div>
-                {/* Avatar */}
                 <div className="absolute bottom-4 right-4 z-20 pointer-events-none">
                     <PixelAvatar 
                       mood={currentEntry.mood} 
