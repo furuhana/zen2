@@ -56,13 +56,18 @@ export const Tape: React.FC<TapeProps> = ({
     windowGrad: `windowGrad-${uniqueId}`,
     plasticNoise: `plasticNoise-${uniqueId}`,
     clipWindow: `clipWindow-${uniqueId}`,
-    gripPattern: `gripPattern-${uniqueId}`
+    gripPattern: `gripPattern-${uniqueId}`,
+    highlightGrad: `highlightGrad-${uniqueId}`
   };
   
   const W = 280;
   const H = 175;
 
   const labelHex = isGhost ? '#9ca3af' : getColorHex(color); 
+  
+  // Parse date for layout (Assuming YYYY.MM.DD)
+  const year = date.split('.')[0] || new Date().getFullYear().toString();
+  const dayMonth = date.split('.').slice(1).join('.') || date;
 
   return (
     <div 
@@ -102,6 +107,11 @@ export const Tape: React.FC<TapeProps> = ({
                <stop offset="0%" stopColor="#111" />
                <stop offset="50%" stopColor="#222" />
                <stop offset="100%" stopColor="#111" />
+            </linearGradient>
+
+            <linearGradient id={ids.highlightGrad} x1="0%" y1="100%" x2="100%" y2="0%">
+               <stop offset="0%" stopColor="#ffffff" stopOpacity="0" />
+               <stop offset="100%" stopColor="#ffffff" stopOpacity="0.5" />
             </linearGradient>
 
             <pattern id={ids.gripPattern} x="0" y="0" width="4" height="4" patternUnits="userSpaceOnUse">
@@ -164,28 +174,30 @@ export const Tape: React.FC<TapeProps> = ({
              fill={`url(#${ids.labelGrad})`} 
           />
 
-          {/* Decorative Lines */}
-          <line x1="20" y1="35" x2={W-20} y2="35" stroke="#000" strokeWidth="2" />
-          <line x1="20" y1="85" x2={W-20} y2="85" stroke="#000" strokeWidth="2" />
-
           {/* === WINDOW AREA === */}
           <g transform={`translate(${W*0.5}, ${H*0.45})`}>
              {/* Window Frame */}
              <rect x={-W*0.28} y={-H*0.18} width={W*0.56} height={H*0.36} rx="4" fill="#222" stroke="#444" strokeWidth="1" />
              
-             {/* Glass Reflection */}
+             {/* Glass Reflection (Subtle left side) */}
              <path d={`M ${-W*0.28} ${-H*0.18} L ${-W*0.18} ${H*0.18} H ${-W*0.28} Z`} fill="#fff" opacity="0.05" />
 
              {/* Clipping for Reels */}
              <g clipPath={`url(#${ids.clipWindow})`} transform={`translate(${-W*0.5}, ${-H*0.45})`}>
-                 {/* Tape Background Ribbon */}
-                 <rect x={W*0.22} y={H*0.42} width={W*0.56} height={H*0.06} fill="#3e2b26" />
+                 {/* Tape Background Ribbon (Grey) */}
+                 <rect x={W*0.22} y={H*0.42} width={W*0.56} height={H*0.06} fill="#4a4a4a" />
 
-                 {/* Left Tape Pack */}
-                 <circle cx={W*0.32} cy={H*0.45} r={isPlaying ? 18 : 26} fill="#3e2b26" />
-                 {/* Right Tape Pack */}
-                 <circle cx={W*0.68} cy={H*0.45} r={isPlaying ? 26 : 18} fill="#3e2b26" />
+                 {/* Left Tape Pack (Grey) */}
+                 <circle cx={W*0.32} cy={H*0.45} r={isPlaying ? 18 : 26} fill="#4a4a4a" />
+                 {/* Right Tape Pack (Grey) */}
+                 <circle cx={W*0.68} cy={H*0.45} r={isPlaying ? 26 : 18} fill="#4a4a4a" />
              </g>
+
+             {/* Highlight Diagonal (Top Layer with Gradient) */}
+             <path 
+               d={`M ${-W*0.1} ${H*0.18} L ${W*0.1} ${-H*0.18} L ${W*0.2} ${-H*0.18} L ${0} ${H*0.18} Z`} 
+               fill={`url(#${ids.highlightGrad})`} 
+             />
           </g>
 
           {/* === REELS (Mechanical) === */}
@@ -237,21 +249,20 @@ export const Tape: React.FC<TapeProps> = ({
               </text>
           )}
 
-          {/* Side A Indicator */}
+          {/* Side A Indicator (Left) */}
           <rect x={25} y={45} width="24" height="24" fill="#111" rx="2" />
           <text x={37} y={62} textAnchor="middle" fontFamily="Arial" fontSize="16" fontWeight="bold" fill={labelHex}>A</text>
 
-          {/* Tech Markings */}
-          <text x={W-35} y={55} textAnchor="end" fontFamily="monospace" fontSize="6" fill="#111" opacity="0.7">TYPE I</text>
-          <text x={W-35} y={65} textAnchor="end" fontFamily="monospace" fontSize="6" fill="#111" opacity="0.7">NORMAL BIAS</text>
+          {/* Emoji (Right - Above Year) */}
+          <text x={W-37} y={58} textAnchor="middle" fontSize="16">{emoji}</text>
 
-          {/* Duration */}
-          <path d={`M ${W-45} 70 H ${W-25} L ${W-25} 80 H ${W-45} Z`} fill="none" stroke="#111" strokeWidth="1" />
-          <text x={W-35} y={78} textAnchor="middle" fontFamily="Arial" fontSize="8" fontWeight="bold" fill="#111">60</text>
+          {/* Year Indicator (Right) */}
+          <path d={`M ${W-50} 65 H ${W-24} L ${W-24} 80 H ${W-50} Z`} fill="none" stroke="#111" strokeWidth="1" />
+          <text x={W-37} y={76} textAnchor="middle" fontFamily="monospace" fontSize="10" fontWeight="bold" fill="#111">{year}</text>
 
-          {/* Date Stamp */}
-          <text x={W*0.5} y={105} textAnchor="middle" fontFamily="monospace" fontSize="8" fill="#555">
-             {date} {emoji}
+          {/* Central Date Stamp (Month.Day) */}
+          <text x={W*0.5} y={105} textAnchor="middle" fontFamily="monospace" fontSize="9" fill="#333" letterSpacing="1">
+             {dayMonth}
           </text>
 
           {/* === SCREWS === */}
@@ -284,30 +295,32 @@ export const Tape: React.FC<TapeProps> = ({
             <rect x="0" y="0" width={W} height={H} rx="12" fill={`url(#${ids.bodyGrad})`} stroke="#000" strokeWidth="1" />
             <rect x="0" y="0" width={W} height={H} rx="12" fill="transparent" filter={`url(#${ids.plasticNoise})`} opacity="0.6" />
             
-            {/* Back Label - Smaller geometric strip */}
-            <path d={`M 30 25 H ${W-30} L ${W-40} 55 H 40 Z`} fill="#ddd" opacity="0.9" />
-            <rect x="40" y="30" width={W-80} height="20" fill={`url(#${ids.labelGrad})`} opacity="0.5" />
-
-            {/* Author Name */}
-            <text x={W*0.5} y={43} textAnchor="middle" fontFamily="monospace" fontSize="10" fontWeight="bold" fill="#111" letterSpacing="2">
-                OP: {author?.toUpperCase()}
+            {/* Top Text: EXCLUSIVE */}
+            <text 
+              x={W*0.5} 
+              y={H*0.5 - 12} 
+              textAnchor="middle" 
+              fontFamily="monospace" 
+              fontSize="10" 
+              fontWeight="bold" 
+              fill="#666" 
+              letterSpacing="2"
+            >
+                EXCLUSIVE
             </text>
 
-            {/* Window Back */}
-            <g transform={`translate(${W*0.5}, ${H*0.45})`}>
-                 <rect x={-W*0.28} y={-H*0.18} width={W*0.56} height={H*0.36} rx="4" fill="#181818" stroke="#333" strokeWidth="1" />
-                 {/* Simple Reels Back */}
-                 <circle cx={-W*0.18} cy={0} r={14} fill="#ddd" />
-                 <circle cx={W*0.18} cy={0} r={14} fill="#ddd" />
-            </g>
-
-            {/* [ B ] Indicator */}
-            <text x={W*0.5} y={H-40} textAnchor="middle" fontFamily="monospace" fontSize="20" fontWeight="bold" fill="#555" letterSpacing="4">
-                [ B ]
+            {/* Bottom Text: Author Name */}
+            <text 
+              x={W*0.5} 
+              y={H*0.5 + 18} 
+              textAnchor="middle" 
+              fontFamily="'Brush Script MT', cursive" 
+              fontSize="24" 
+              fill="#999" 
+              style={{ transform: 'rotate(-2deg)', transformOrigin: 'center' }}
+            >
+                {author || 'Unknown'}
             </text>
-
-            {/* Grip Texture Back */}
-            <rect x="20" y={H-25} width={W-40} height="10" fill={`url(#${ids.gripPattern})`} opacity="0.3" />
 
             {/* Screws */}
             {[ {x: 12, y: 12}, {x: W-12, y: 12}, {x: 12, y: H-12}, {x: W-12, y: H-12} ].map((pos, i) => (
